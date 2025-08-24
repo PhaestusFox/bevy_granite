@@ -26,10 +26,10 @@ pub fn drag_transform_gizmo(
     >,
     mut objects: Query<&mut Transform>,
     gizmo_snap: Res<GizmoSnap>,
-    gizmo_data: Query<&GizmoAxis>,
+    gizmo_data: Query<(&GizmoAxis, &TransformGizmo)>,
     input: Res<ButtonInput<KeyCode>>,
 ) {
-    let Ok(axis) = gizmo_data.get(event.target) else {
+    let Ok((axis, typ)) = gizmo_data.get(event.target) else {
         log!(
             LogType::Editor,
             LogLevel::Warning,
@@ -84,9 +84,9 @@ pub fn drag_transform_gizmo(
     };
 
     let start = target_transform.translation;
-    match axis {
-        GizmoAxis::None => {}
-        GizmoAxis::X => {
+    match (axis, typ) {
+        (GizmoAxis::None, _) => {}
+        (GizmoAxis::X, TransformGizmo::Axis) => {
             let Some(click_distance) = click_ray.intersect_plane(
                 Vec3::new(0., target_transform.translation.y, 0.),
                 bevy::math::primitives::InfinitePlane3d::new(Vec3::Y),
@@ -96,7 +96,7 @@ pub fn drag_transform_gizmo(
             let hit = camera_transform.translation() - (click_ray.direction * -click_distance);
             target_transform.translation.x = snap_gizmo(hit.x, gizmo_snap.transform_value);
         }
-        GizmoAxis::Y => {
+        (GizmoAxis::Y, TransformGizmo::Axis) => {
             let mut normal = camera_transform.forward().as_vec3();
             normal.y = 0.0;
             let Some(click_distance) = click_ray.intersect_plane(
@@ -112,7 +112,7 @@ pub fn drag_transform_gizmo(
             let hit = camera_transform.translation() - (click_ray.direction * -click_distance);
             target_transform.translation.y = snap_gizmo(hit.y, gizmo_snap.transform_value);
         }
-        GizmoAxis::Z => {
+        (GizmoAxis::Z, TransformGizmo::Axis) => {
             let Some(click_distance) = click_ray.intersect_plane(
                 Vec3::new(0., target_transform.translation.y, 0.),
                 bevy::math::primitives::InfinitePlane3d::new(Vec3::Y),
@@ -122,7 +122,40 @@ pub fn drag_transform_gizmo(
             let hit = camera_transform.translation() - (click_ray.direction * -click_distance);
             target_transform.translation.z = snap_gizmo(hit.z, gizmo_snap.transform_value);
         }
-        GizmoAxis::All => {
+        (GizmoAxis::X, TransformGizmo::Plane) => {
+            let Some(click_distance) = click_ray.intersect_plane(
+                Vec3::new(target_transform.translation.x, 0., 0.),
+                bevy::math::primitives::InfinitePlane3d::new(Vec3::X),
+            ) else {
+                return;
+            };
+            let hit = camera_transform.translation() - (click_ray.direction * -click_distance);
+            target_transform.translation.y = snap_gizmo(hit.y, gizmo_snap.transform_value);
+            target_transform.translation.z = snap_gizmo(hit.z, gizmo_snap.transform_value);
+        }
+        (GizmoAxis::Y, TransformGizmo::Plane) => {
+            let Some(click_distance) = click_ray.intersect_plane(
+                Vec3::new(0., target_transform.translation.y, 0.),
+                bevy::math::primitives::InfinitePlane3d::new(Vec3::Y),
+            ) else {
+                return;
+            };
+            let hit = camera_transform.translation() - (click_ray.direction * -click_distance);
+            target_transform.translation.x = snap_gizmo(hit.x, gizmo_snap.transform_value);
+            target_transform.translation.z = snap_gizmo(hit.z, gizmo_snap.transform_value);
+        }
+        (GizmoAxis::Z, TransformGizmo::Plane) => {
+            let Some(click_distance) = click_ray.intersect_plane(
+                Vec3::new(0., 0., target_transform.translation.z),
+                bevy::math::primitives::InfinitePlane3d::new(Vec3::Z),
+            ) else {
+                return;
+            };
+            let hit = camera_transform.translation() - (click_ray.direction * -click_distance);
+            target_transform.translation.x = snap_gizmo(hit.x, gizmo_snap.transform_value);
+            target_transform.translation.y = snap_gizmo(hit.y, gizmo_snap.transform_value);
+        }
+        (GizmoAxis::All, _) => {
             let Some(click_distance) = click_ray.intersect_plane(
                 target_transform.translation,
                 bevy::math::primitives::InfinitePlane3d::new(camera_transform.forward()),
@@ -151,13 +184,13 @@ fn snap_gizmo(value: f32, inc: f32) -> f32 {
 }
 
 pub fn draw_axis_lines(
-    mut event: Trigger<Pointer<Pressed>>,
-    gizmo_data: Query<(&GizmoAxis, &GizmoOf), With<TransformGizmo>>,
+    event: Trigger<Pointer<Pressed>>,
+    gizmo_data: Query<(&GizmoAxis, &GizmoOf, &TransformGizmo), With<TransformGizmo>>,
     mut bevy_gizmo: ResMut<Assets<GizmoAsset>>,
     mut commands: Commands,
     origin: Query<&Transform>,
 ) {
-    let Ok((axis, root)) = gizmo_data.get(event.target) else {
+    let Ok((axis, root, transform)) = gizmo_data.get(event.target) else {
         return;
     };
     if let GizmoAxis::All = axis {
@@ -174,11 +207,28 @@ pub fn draw_axis_lines(
         return;
     };
     let mut asset = GizmoAsset::new();
-    asset.line(
-        origin.translation + axis.to_vec3() * 1000.,
-        origin.translation + axis.to_vec3() * -1000.,
-        axis.color(),
-    );
+    match transform {
+        TransformGizmo::Axis => {
+            asset.line(
+                origin.translation + axis.to_vec3() * 1000.,
+                origin.translation + axis.to_vec3() * -1000.,
+                axis.color(),
+            );
+        }
+        TransformGizmo::Plane => {
+            let (a, b) = axis.plane();
+            asset.line(
+                origin.translation + a.to_vec3() * 1000.,
+                origin.translation + a.to_vec3() * -1000.,
+                a.color(),
+            );
+            asset.line(
+                origin.translation + b.to_vec3() * 1000.,
+                origin.translation + b.to_vec3() * -1000.,
+                b.color(),
+            );
+        }
+    }
 
     commands.spawn((
         *axis,

@@ -2,11 +2,11 @@ use bevy::{
     ecs::hierarchy::ChildOf,
     pbr::{MeshMaterial3d, NotShadowCaster, NotShadowReceiver},
     prelude::{
-        AlphaMode, Assets, Children, Color, Commands, Component, Cone, Cylinder, Entity,
-        GlobalTransform, Mesh, Meshable, Name, Quat, Query, ResMut, Resource, Sphere,
-        StandardMaterial, Transform, Vec3, Visibility, Without,
+        AlphaMode, Assets, Color, Commands, Component, Cone, Cylinder, Entity, GlobalTransform,
+        Mesh, Meshable, Name, Quat, Query, ResMut, Resource, Sphere, StandardMaterial, Transform,
+        Vec3, Visibility, Without,
     },
-    render::{mesh::Mesh3d, view::RenderLayers},
+    render::mesh::Mesh3d,
 };
 use bevy_granite_logging::{
     config::{LogCategory, LogLevel, LogType},
@@ -14,7 +14,7 @@ use bevy_granite_logging::{
 };
 
 use crate::{
-    gizmos::{GizmoChildren, GizmoMesh, GizmoOf, GizmoRoot},
+    gizmos::{GizmoMesh, GizmoOf, GizmoRoot},
     input::GizmoAxis,
 };
 

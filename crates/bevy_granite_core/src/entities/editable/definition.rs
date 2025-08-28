@@ -1,7 +1,7 @@
 use super::RequestEntityUpdateFromClass;
 use crate::{
-    entities::{EntitySaveReadyData, PromptData}, AvailableEditableMaterials, ClassCategory, RequiredMaterialData,
-    RequiredMaterialDataMut,
+    entities::{EntitySaveReadyData, PromptData},
+    AvailableEditableMaterials, ClassCategory, RequiredMaterialData, RequiredMaterialDataMut,
 };
 use bevy::{
     asset::{AssetServer, Assets, Handle},
@@ -78,7 +78,7 @@ pub trait GraniteType {
                 bevy::render::texture::ImageSampler::Default,
                 bevy::render::render_asset::RenderAssetUsages::RENDER_WORLD,
             )
-            .unwrap_or_else(|_| panic!("Failed to load embedded {}", filename));
+            .unwrap_or_else(|e| panic!("Failed to load embedded {}: {e}", filename));
 
             let handle = Handle::<Image>::weak_from_u128(self.icon_handle_id());
             images.insert(handle.id(), image);

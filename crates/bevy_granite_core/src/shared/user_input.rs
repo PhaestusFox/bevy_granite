@@ -6,13 +6,13 @@ pub struct CursorWindowPos {
     pub position: Vec2,
 }
 
-#[derive(Clone, Copy, PartialEq, Eq)]
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum InputTypes {
     Mouse(MouseButton),
     Button(KeyCode),
 }
 
-#[derive(Default, Resource, Clone)]
+#[derive(PartialEq, Default, Resource, Clone, Debug)]
 pub struct UserInput {
     pub current_button_inputs: Vec<InputTypes>,
     pub mouse_pos: Vec2,
@@ -41,7 +41,7 @@ pub struct UserInput {
     pub key_space: UserButtonState,
 }
 
-#[derive(Default, Clone, Copy)]
+#[derive(PartialEq, Default, Clone, Copy, Debug)]
 pub struct UserButtonState {
     pub just_pressed: bool,
     pub pressed: bool,
@@ -103,7 +103,7 @@ pub fn capture_input_events(
     user_input.current_button_inputs.clear();
 
     // Capture mouse position
-    if let Ok(window) = windows.get_single() {
+    if let Ok(window) = windows.single() {
         if let Some(cursor_pos) = window.cursor_position() {
             user_input.mouse_pos = cursor_pos;
         }
@@ -181,11 +181,20 @@ pub fn capture_input_events(
     user_input.key_space = key_space;
     user_input.alt_left = alt_left;
 
-    user_input.mouse_over_egui = contexts.ctx_mut().is_pointer_over_area();
+    if let Ok(ctx) = contexts.ctx_mut() {
+        // Check if the mouse is over an Egui area
+        user_input.mouse_over_egui = ctx.is_pointer_over_area();
+    } else {
+        // If we can't get the context, assume not over Egui
+        user_input.mouse_over_egui = false;
+    }
 }
 
 pub fn update_mouse_pos(windows: Query<&Window>, mut cursor: ResMut<CursorWindowPos>) {
-    let window = windows.single();
+    let Ok(window) = windows.single() else {
+        // todo: log to user multiple windows not supported
+        return;
+    };
     if let Some(cursor_position) = window.cursor_position() {
         cursor.position = Vec2::new(
             (cursor_position.x / window.width() * 2.0) - 1.0,

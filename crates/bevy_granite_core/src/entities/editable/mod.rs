@@ -1,17 +1,17 @@
 use crate::{
-    entities::EntitySaveReadyData, AvailableEditableMaterials, RequiredMaterialData,
-    RequiredMaterialDataMut, PromptData
+    entities::EntitySaveReadyData, AvailableEditableMaterials, PromptData, RequiredMaterialData,
+    RequiredMaterialDataMut,
 };
 use bevy::{
-    asset::{AssetServer, Assets, Handle},
+    asset::{AssetId, AssetServer, Assets, Handle},
     ecs::{
         entity::Entity,
         system::{Commands, Res, ResMut},
     },
     ecs::{event::EventWriter, system::SystemParam},
     pbr::StandardMaterial,
-    prelude::Reflect,
-    render::{mesh::Mesh, texture::Image},
+    prelude::{Image, Reflect},
+    render::mesh::Mesh,
     transform::components::Transform,
 };
 use bevy_egui::egui;

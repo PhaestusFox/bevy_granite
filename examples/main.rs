@@ -1,6 +1,7 @@
 // main.rs - bevy 0.14
-use bevy::prelude::*;
-use bevy_granite::prelude::*; // Import the Granite plugin prelude
+use bevy::{input::keyboard::Key, prelude::*};
+use bevy_granite::prelude::*;
+use bevy_inspector_egui::bevy_egui::{EguiContext, EguiContexts}; // Import the Granite plugin prelude
 
 const STARTING_WORLD: &str = "scenes/starting.scene"; // Your starting world file. Doesn't have to actually exist yet
 
@@ -39,7 +40,7 @@ fn main() {
         // Add the Granite plugin
         // Make sure to pass a default world otherwise a default will be used
         // It it used to easily save/load your starting world via UI
-        .add_plugins(bevy_granite::BevyGranite{
+        .add_plugins(bevy_granite::BevyGranite {
             default_world: STARTING_WORLD.to_string(),
             ..Default::default()
         })
@@ -50,5 +51,5 @@ fn main() {
 fn setup(mut open_event: EventWriter<RequestLoadEvent>) {
     // Event to load a world (.scene)
     // When finished loading it will send a `WorldLoadSuccessEvent` with the loaded world str name
-    open_event.send(RequestLoadEvent(STARTING_WORLD.to_string()));
+    open_event.write(RequestLoadEvent(STARTING_WORLD.to_string()));
 }

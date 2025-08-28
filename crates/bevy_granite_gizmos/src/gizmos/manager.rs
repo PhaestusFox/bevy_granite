@@ -25,14 +25,6 @@ pub fn gizmo_events(
     mut transform_gizmo_query: Query<(Entity, &TransformGizmo, &Children)>,
     mut rotate_gizmo_query: Query<(Entity, &RotateGizmo, &Children)>,
 ) {
-    for DespawnGizmoEvent(value) in despawn_events.read() {
-        if matches!(value, GizmoType::Transform) {
-            despawn_transform_gizmo(&mut commands, &mut transform_gizmo_query);
-        } else if matches!(value, GizmoType::Rotate) {
-            despawn_rotate_gizmo(&mut commands, &mut rotate_gizmo_query);
-        }
-    }
-
     for SpawnGizmoEvent(entity) in spawn_events.read() {
         if matches!(selected_gizmo.value, GizmoType::Transform) {
             spawn_transform_gizmo(
@@ -52,6 +44,14 @@ pub fn gizmo_events(
             );
         }
     }
+
+    for DespawnGizmoEvent(gizmo_type) in despawn_events.read() {
+        if matches!(gizmo_type, GizmoType::Transform) {
+            despawn_transform_gizmo(&mut commands, &mut transform_gizmo_query);
+        } else if matches!(gizmo_type, GizmoType::Rotate) {
+            despawn_rotate_gizmo(&mut commands, &mut rotate_gizmo_query);
+        }
+    }
 }
 
 pub fn gizmo_changed_watcher(
@@ -68,11 +68,11 @@ pub fn gizmo_changed_watcher(
             LogCategory::Entity,
             "Gizmo changed"
         );
-        despawn_writer.send(DespawnGizmoEvent(last_selected_gizmo.value));
+        despawn_writer.write(DespawnGizmoEvent(last_selected_gizmo.value));
         last_selected_gizmo.value = selected_gizmo.value;
 
-        if active_selection.iter().len() > 0 {
-            spawn_writer.send(SpawnGizmoEvent(active_selection.single()));
+        if let Ok(active) = active_selection.single() {
+            spawn_writer.write(SpawnGizmoEvent(active));
         }
     }
 }

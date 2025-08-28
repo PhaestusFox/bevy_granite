@@ -4,19 +4,21 @@ use crate::{
     AvailableEditableMaterials, ClassCategory, RequiredMaterialData, RequiredMaterialDataMut,
 };
 use bevy::{
-    asset::{AssetServer, Assets, Handle},
+    asset::{AssetId, AssetServer, Assets, Handle},
     ecs::{
         entity::Entity,
         system::{Commands, Res, ResMut},
     },
     pbr::StandardMaterial,
-    render::{mesh::Mesh, texture::Image},
+    prelude::Image,
+    render::mesh::Mesh,
     transform::components::Transform,
 };
 use bevy_egui::egui;
 use enum_dispatch::enum_dispatch;
 use std::collections::hash_map::DefaultHasher;
 use std::hash::{Hash, Hasher};
+use uuid::Uuid;
 
 /// Central trait that all Granite Editor class types must implement
 /// We use enum_dispatch for static polymorphism - i.e. all variants of our enum need same functions available to themselves, and exposed up a level - this saves us a tremendous amount of match arms in our enum
@@ -41,8 +43,8 @@ pub trait GraniteType {
     /// If we require user input, this is the config to send to the dialog browser
     /// Base path is first string - relative!
     /// Second list of vectors is file extensions to show in popup
-    fn get_prompt_config(&self) -> (String, Vec<String>) {
-        ("".to_string(), vec!["*".to_string()])
+    fn get_prompt_config(&self) -> (String, Vec<&'static str>) {
+        ("".to_string(), vec!["*"])
     }
 
     /// Provide the embedded icon bytes - override this if your type has an icon
@@ -58,10 +60,11 @@ pub trait GraniteType {
     }
 
     /// Generate icon handle ID from type name
-    fn icon_handle_id(&self) -> u128 {
+    fn icon_handle_id(&self) -> AssetId<Image> {
         let mut hasher = DefaultHasher::new();
         self.type_name().hash(&mut hasher);
-        hasher.finish() as u128
+        let id = hasher.finish() as u128;
+        AssetId::<Image>::from(Uuid::from_u128(id))
     }
 
     /// Register embedded icon - default implementation provided, only registers if icon data exists
@@ -72,15 +75,15 @@ pub trait GraniteType {
         {
             let image = Image::from_buffer(
                 icon_bytes,
-                bevy::render::texture::ImageType::Extension("png"),
-                bevy::render::texture::CompressedImageFormats::all(),
+                bevy::image::ImageType::Extension("png"),
+                bevy::image::CompressedImageFormats::all(),
                 true,
-                bevy::render::texture::ImageSampler::Default,
+                bevy::image::ImageSampler::Default,
                 bevy::render::render_asset::RenderAssetUsages::RENDER_WORLD,
             )
-            .unwrap_or_else(|e| panic!("Failed to load embedded {}: {e}", filename));
+            .unwrap_or_else(|e| panic!("Failed to load embedded {filename}: {e:?}"));
 
-            let handle = Handle::<Image>::weak_from_u128(self.icon_handle_id());
+            let handle: Handle<Image> = Handle::Weak(self.icon_handle_id());
             images.insert(handle.id(), image);
         }
     }
@@ -88,7 +91,7 @@ pub trait GraniteType {
     /// Get icon handle - returns None if no icon
     fn get_icon_handle(&self) -> Option<Handle<Image>> {
         if self.get_embedded_icon_bytes().is_some() {
-            Some(Handle::<Image>::weak_from_u128(self.icon_handle_id()))
+            Some(Handle::Weak(self.icon_handle_id()))
         } else {
             None
         }

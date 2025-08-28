@@ -1,5 +1,8 @@
+use std::borrow::Cow;
+
 use bevy::{
-    ecs::{component::Component, system::Resource},
+    ecs::component::Component,
+    ecs::resource::Resource,
     prelude::{
         Quat, ReflectComponent, ReflectDefault, ReflectDeserialize, ReflectFromReflect,
         ReflectSerialize, Vec3,
@@ -28,7 +31,23 @@ pub struct MainCamera;
 /// String is relative path from /assets
 #[derive(Reflect, Serialize, Deserialize, Debug, Clone, Component, Default, PartialEq)]
 #[reflect(Component, Serialize, Deserialize, Default, FromReflect)]
-pub struct SpawnSource(pub String);
+pub struct SpawnSource(Cow<'static, str>);
+impl SpawnSource {
+    pub fn new(path: impl Into<Cow<'static, str>>) -> Self {
+        Self(path.into())
+    }
+
+    pub fn str_ref(&self) -> &str {
+        self.0.as_ref()
+    }
+}
+
+impl core::ops::Deref for SpawnSource {
+    type Target = str;
+    fn deref(&self) -> &Self::Target {
+        self.0.as_ref()
+    }
+}
 
 /// Camera for UI Editor Elements
 #[derive(Reflect, Serialize, Deserialize, Debug, Clone, Component, Default, PartialEq)]
@@ -141,7 +160,7 @@ impl Default for PromptData {
 
 // Re-exports
 pub use component_editor::{
-    is_bridge_component_check, BridgeTag, ComponentEditor, ReflectedComponent,
+    is_bridge_component_check, BridgeTag, ComponentEditor, ExposedToEditor, ReflectedComponent,
 };
 pub use deserialize::{deserialize_entities, GraniteEditorSerdeEntity};
 pub use editable::{
@@ -154,3 +173,17 @@ pub use lifecycle::{
 };
 pub use plugin::EntityPlugin;
 pub use serialize::{serialize_entities, EntitySaveReadyData, SceneData, SceneMetadata};
+
+// Im adding this so you cant select the editor camera
+// and to stop a crash because you can select a gizmo that then despawns its self
+bitflags::bitflags! {
+    /// A marker component that an entity should be ignored by the editor
+    /// This will be more powerful then not having Bridge
+    /// As this is explicitly added to an entity
+    #[derive(bevy::ecs::component::Component, Default)]
+    pub struct EditorIgnore: usize {
+        const GIZMO = 1;
+        const PICKING = 2;
+        const SERIALIZE = 3;
+    }
+}

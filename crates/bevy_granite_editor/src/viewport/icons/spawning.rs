@@ -1,12 +1,15 @@
-use super::{IconBundle, IconEntity};
+use super::IconEntity;
 use crate::{editor_state::EditorState, viewport::config::VisualizationConfig};
 use bevy::{
-    hierarchy::BuildChildren,
-    pbr::{NotShadowCaster, NotShadowReceiver, PbrBundle, StandardMaterial},
+    pbr::{MeshMaterial3d, NotShadowCaster, NotShadowReceiver, StandardMaterial},
     prelude::{
         Assets, Commands, Entity, Handle, Image, Mesh, Name, Query, Res, ResMut, Transform, Without,
     },
-    render::{alpha::AlphaMode, mesh::Indices, view::RenderLayers},
+    render::{
+        alpha::AlphaMode,
+        mesh::{Indices, Mesh3d},
+        view::RenderLayers,
+    },
 };
 use bevy_granite_core::{GraniteType, IconProxy, IdentityData, TreeHiddenEntity};
 
@@ -40,13 +43,13 @@ pub fn spawn_icon_entities_system(
             let handle = class.get_icon_handle();
             let name = class.type_name() + "_icon";
 
-            if handle.is_some() {
+            if let Some(handle) = handle {
                 spawn_icon_for_entity(
                     &mut commands,
                     &mut meshes,
                     &mut materials,
                     entity,
-                    handle.unwrap(),
+                    handle,
                     name,
                     config,
                 );
@@ -71,7 +74,7 @@ fn spawn_icon_for_entity(
     // Create material with the embedded icon texture
     let material_handle = materials.add(StandardMaterial {
         base_color_texture: Some(texture_handle),
-        base_color: bevy::color::Color::srgb_from_array(config.icon_color).into(),
+        base_color: bevy::color::Color::srgb_from_array(config.icon_color),
         unlit: true,
         alpha_mode: AlphaMode::Mask(0.5), // Use alpha cutout for icons
         cull_mode: None,
@@ -80,16 +83,11 @@ fn spawn_icon_for_entity(
 
     let icon_entity = commands
         .spawn((
-            IconBundle {
-                icon_entity: IconEntity { target_entity },
-                pbr_bundle: PbrBundle {
-                    mesh: mesh_handle,
-                    material: material_handle,
-                    transform: Transform::default(), // Offset relative to parent
-                    ..Default::default()
-                },
-                name: Name::new(icon_name),
-            },
+            IconEntity { target_entity },
+            Mesh3d(mesh_handle),
+            MeshMaterial3d(material_handle),
+            Name::new(icon_name),
+            Transform::default(), // Offset relative to parent
             TreeHiddenEntity,
             IconProxy { target_entity },
             RenderLayers::from_layers(&[14]), // 14 is our UI/Gizmo layer.

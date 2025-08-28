@@ -1,6 +1,7 @@
 use super::{ComponentEditor, EntitySaveReadyData, IdentityData, SceneData, SpawnSource};
 use crate::{
-    absolute_asset_to_rel, materials_from_folder_into_scene, shared::is_scene_version_compatible, AvailableEditableMaterials, GraniteType
+    absolute_asset_to_rel, materials_from_folder_into_scene, shared::is_scene_version_compatible,
+    AvailableEditableMaterials, GraniteType,
 };
 use bevy::{
     ecs::{entity::Entity, system::ResMut, world::World},
@@ -14,8 +15,8 @@ use bevy_granite_logging::{
 };
 use ron::de::from_str;
 use serde::{Deserialize, Serialize};
-use std::fs::File;
 use std::io::Read;
+use std::{borrow::Cow, fs::File};
 use uuid::Uuid;
 
 // Main component to tag all of our custom entity class types
@@ -34,14 +35,19 @@ pub fn deserialize_entities(
     materials: &mut ResMut<Assets<StandardMaterial>>,
     available_materials: &mut ResMut<AvailableEditableMaterials>,
     mut meshes: ResMut<Assets<Mesh>>,
-    abs_path: String, //absolute
+    abs_path: impl Into<Cow<'static, str>>, //absolute
 ) {
+    let abs_path: Cow<'static, str> = abs_path.into();
     // Build materials from the folder and load them into the scene
     materials_from_folder_into_scene("materials", materials, available_materials, asset_server);
 
     // Gather file contents into a Vec<EntitySaveReadyData>
-    let deserialized_data =
-        gather_file_contents(asset_server, materials, available_materials, abs_path.clone());
+    let deserialized_data = gather_file_contents(
+        asset_server,
+        materials,
+        available_materials,
+        abs_path.as_ref(),
+    );
 
     // for id
     let mut uuid_to_entity_map: std::collections::HashMap<Uuid, Entity> =
@@ -56,15 +62,15 @@ pub fn deserialize_entities(
             materials,
             available_materials,
             &mut meshes,
-            &save_data,
+            save_data,
         );
 
         // Map the stored GUID to the new entity
         uuid_to_entity_map.insert(save_data.identity.uuid, entity);
 
         // Tag entity with its source file
-        let relative = absolute_asset_to_rel(abs_path.clone());
-        commands.entity(entity).insert(SpawnSource(relative));
+        let relative: Cow<'static, str> = absolute_asset_to_rel(abs_path.to_string());
+        commands.entity(entity).insert(SpawnSource::new(relative));
 
         // Store parent relationships for second pass
         if let Some(parent_guid) = save_data.parent {
@@ -92,7 +98,7 @@ pub fn deserialize_entities(
             let component_map = component_map.clone();
             let entity_copy = entity;
 
-            commands.add(move |world: &mut World| {
+            commands.queue(move |world: &mut World| {
                 // Get the current type registry from the world
                 let type_registry = world.resource::<AppTypeRegistry>().clone();
 
@@ -112,7 +118,6 @@ pub fn deserialize_entities(
     }
 
     // Apply relationships
-    use bevy::hierarchy::BuildChildren;
     for (child_entity, parent_guid) in parent_relationships {
         if let Some(&parent_entity) = uuid_to_entity_map.get(&parent_guid) {
             commands.entity(parent_entity).add_child(child_entity);
@@ -155,7 +160,7 @@ fn gather_file_contents(
     asset_server: &Res<AssetServer>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
     available_materials: &mut ResMut<AvailableEditableMaterials>,
-    path: String,
+    path: &str,
 ) -> Vec<EntitySaveReadyData> {
     log!(
         LogType::Game,

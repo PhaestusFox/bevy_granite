@@ -1,15 +1,15 @@
 use super::ui::expand_to_entity;
-use crate::interface::{SideDockState, SideTab};
 use crate::interface::events::RequestRemoveParentsFromEntities;
+use crate::interface::{SideDockState, SideTab};
+use bevy::ecs::query::Has;
+use bevy::ecs::system::Commands;
 use bevy::{
     ecs::query::{Changed, Or},
-    prelude::{Entity, Event, EventWriter, Name, Parent, Query, ResMut, With, Without},
+    prelude::{ChildOf, Entity, Event, EventWriter, Name, Query, ResMut, With},
 };
 use bevy_granite_core::{GraniteType, IdentityData, TreeHiddenEntity};
-use bevy_granite_gizmos::{
-    ActiveSelection, GizmoMesh, GizmoParent, RequestDeselectEntityEvent, RequestSelectEntityEvent,
-    RequestSelectEntityRangeEvent, Selected,
-};
+use bevy_granite_gizmos::selection::events::EntityEvent;
+use bevy_granite_gizmos::{ActiveSelection, GizmoChildren, GizmoMesh, Selected};
 use bevy_granite_logging::{log, LogCategory, LogLevel, LogType};
 
 #[derive(Debug, Clone, Event)]
@@ -18,8 +18,9 @@ pub struct RequestReparentEntityEvent {
     pub new_parent: Entity,    // The target parent entity
 }
 
-#[derive(Debug, Clone, PartialEq, Default)]
+#[derive(Debug, Clone, PartialEq)]
 pub struct NodeTreeTabData {
+    pub filtered_hierarchy: bool, // whether the hierarchy shows all entities or hides editor related ones
     pub active_selection: Option<Entity>,
     pub selected_entities: Vec<Entity>,
     pub new_selection: Option<Entity>,
@@ -35,6 +36,26 @@ pub struct NodeTreeTabData {
     pub drop_target: Option<Entity>,       // Entity being dropped onto
 }
 
+impl Default for NodeTreeTabData {
+    fn default() -> Self {
+        Self {
+            filtered_hierarchy: true,
+            active_selection: None,
+            selected_entities: Vec::new(),
+            new_selection: None,
+            additive_selection: false,
+            range_selection: false,
+            clicked_via_node_tree: false,
+            tree_click_frames_remaining: 0,
+            hierarchy: Vec::new(),
+            should_scroll_to_selection: false,
+            previous_active_selection: None,
+            search_filter: String::new(),
+            drag_payload: None,
+            drop_target: None,
+        }
+    }
+}
 #[derive(Debug, Clone, PartialEq)]
 pub struct HierarchyEntry {
     pub entity: Entity,
@@ -48,41 +69,55 @@ pub fn update_node_tree_tabs_system(
     mut right_dock: ResMut<SideDockState>,
     active_selection: Query<Entity, With<ActiveSelection>>,
     all_selected: Query<Entity, With<Selected>>,
-    hierarchy_query: Query<
-        (Entity, &Name, Option<&Parent>, Option<&IdentityData>),
-        (
-            Without<GizmoParent>,
-            Without<GizmoMesh>,
-            Without<TreeHiddenEntity>,
-        ),
-    >,
-    // detect changes (excluding Parent since we check that manually)
-    changed_hierarchy: Query<
+    mut hierarchy_query: Query<(
         Entity,
-        (
-            Or<(Changed<Name>, Changed<IdentityData>)>,
-            Without<GizmoParent>,
-            Without<GizmoMesh>,
-            Without<TreeHiddenEntity>,
-        ),
+        &Name,
+        Option<&ChildOf>,
+        Option<&IdentityData>,
+        (Has<GizmoChildren>, Has<GizmoMesh>, Has<TreeHiddenEntity>),
+    )>,
+
+    // detect changes (excluding Parent since we check that manually)
+    mut changed_hierarchy: Query<
+        (Has<GizmoChildren>, Has<GizmoMesh>, Has<TreeHiddenEntity>),
+        Or<(Changed<Name>, Changed<IdentityData>)>,
     >,
-    mut select_event_writer: EventWriter<RequestSelectEntityEvent>,
-    mut deselect_event_writer: EventWriter<RequestDeselectEntityEvent>,
-    mut select_range_event_writer: EventWriter<RequestSelectEntityRangeEvent>,
+    mut commands: Commands,
     mut reparent_event_writer: EventWriter<RequestReparentEntityEvent>,
     mut remove_parents_event_writer: EventWriter<RequestRemoveParentsFromEntities>,
 ) {
     for (_, tab) in right_dock.dock_state.iter_all_tabs_mut() {
         if let SideTab::NodeTree { ref mut data, .. } = tab {
             let previous_selection = data.active_selection;
-            data.active_selection = active_selection.get_single().ok();
+            data.active_selection = active_selection.single().ok();
             data.selected_entities = all_selected.iter().collect();
 
-            let (entities_changed, data_changed, hierarchy_changed) = 
-                detect_changes(&hierarchy_query, &changed_hierarchy, data);
+            let (entities_changed, data_changed, hierarchy_changed) = if data.filtered_hierarchy {
+                let q = hierarchy_query
+                    .iter()
+                    .filter(|(_, _, _, _, a)| !(a.0 || a.1 || a.2))
+                    .map(|(a, b, c, d, _)| (a, b, c, d));
+                let c = changed_hierarchy
+                    .iter()
+                    .any(|filter| !(filter.0 || filter.1 || filter.2));
+                detect_changes(q, c, data)
+            } else {
+                let q = hierarchy_query.iter().map(|(a, b, c, d, _)| (a, b, c, d));
+                let c = !changed_hierarchy.is_empty();
+                detect_changes(q, c, data)
+            };
 
             if entities_changed || data_changed || hierarchy_changed {
-                update_hierarchy_data(data, &hierarchy_query, hierarchy_changed);
+                if data.filtered_hierarchy {
+                    let q = hierarchy_query
+                        .iter()
+                        .filter(|(_, _, _, _, a)| !(a.0 || a.1 || a.2))
+                        .map(|(a, b, c, d, _)| (a, b, c, d));
+                    update_hierarchy_data(data, q, hierarchy_changed);
+                } else {
+                    let q = hierarchy_query.iter().map(|(a, b, c, d, _)| (a, b, c, d));
+                    update_hierarchy_data(data, q, hierarchy_changed);
+                }
             }
 
             // Check if selection changed externally
@@ -94,7 +129,7 @@ pub fn update_node_tree_tabs_system(
                     // Auto-expand and scroll for any external selection change (including initial selection)
                     expand_to_entity(&mut data.hierarchy, new_active);
                     data.should_scroll_to_selection = true;
-                    
+
                     log!(
                         LogType::Editor,
                         LogLevel::Info,
@@ -116,17 +151,17 @@ pub fn update_node_tree_tabs_system(
                         if let Some(prev) = data.active_selection {
                             // Build visual order of currently visible nodes
                             let visual_order = build_visual_order(&data.hierarchy);
-                            
+
                             // Find indices in visual order
                             let prev_index = visual_order.iter().position(|&e| e == prev);
                             let new_index = visual_order.iter().position(|&e| e == new_selection);
-                            
+
                             if let (Some(prev_idx), Some(new_idx)) = (prev_index, new_index) {
                                 let start = prev_idx.min(new_idx);
                                 let end = prev_idx.max(new_idx);
-                                
+
                                 let range_entities = visual_order[start..=end].to_vec();
-                                
+
                                 log!(
                                     LogType::Editor,
                                     LogLevel::Info,
@@ -136,9 +171,9 @@ pub fn update_node_tree_tabs_system(
                                     new_selection,
                                     range_entities.len()
                                 );
-                                
-                                select_range_event_writer.send(RequestSelectEntityRangeEvent {
-                                    entities: range_entities,
+
+                                commands.trigger(EntityEvent::SelectRange {
+                                    range: range_entities,
                                     additive: true,
                                 });
                                 // Always set the clicked entity as active selection
@@ -147,8 +182,8 @@ pub fn update_node_tree_tabs_system(
                                 data.previous_active_selection = Some(prev);
                             } else {
                                 // Fallback to single selection if either entity not found in visual order
-                                select_event_writer.send(RequestSelectEntityEvent {
-                                    entity: new_selection,
+                                commands.trigger(EntityEvent::Select {
+                                    target: new_selection,
                                     additive: false,
                                 });
                                 data.previous_active_selection = data.active_selection;
@@ -156,8 +191,8 @@ pub fn update_node_tree_tabs_system(
                             }
                         } else {
                             // No previous selection, fallback to single
-                            select_event_writer.send(RequestSelectEntityEvent {
-                                entity: new_selection,
+                            commands.trigger(EntityEvent::Select {
+                                target: new_selection,
                                 additive: false,
                             });
                             data.previous_active_selection = data.active_selection;
@@ -168,11 +203,13 @@ pub fn update_node_tree_tabs_system(
                         let already_selected = data.selected_entities.contains(&new_selection);
                         if already_selected {
                             // Deselect
-                            deselect_event_writer.send(RequestDeselectEntityEvent(new_selection));
+                            commands.trigger(EntityEvent::Deselect {
+                                target: new_selection,
+                            });
                         } else {
                             // Add to selection
-                            select_event_writer.send(RequestSelectEntityEvent {
-                                entity: new_selection,
+                            commands.trigger(EntityEvent::Select {
+                                target: new_selection,
                                 additive: true,
                             });
                         }
@@ -181,8 +218,8 @@ pub fn update_node_tree_tabs_system(
                         data.active_selection = Some(new_selection);
                     } else {
                         // Normal selection
-                        select_event_writer.send(RequestSelectEntityEvent {
-                            entity: new_selection,
+                        commands.trigger(EntityEvent::Select {
+                            target: new_selection,
                             additive: false,
                         });
                         data.previous_active_selection = data.active_selection;
@@ -196,7 +233,7 @@ pub fn update_node_tree_tabs_system(
             data.new_selection = None;
             data.additive_selection = false;
             data.range_selection = false;
-            
+
             // Decrement frame counter for tree click protection
             if data.tree_click_frames_remaining > 0 {
                 data.tree_click_frames_remaining -= 1;
@@ -214,7 +251,7 @@ pub fn update_node_tree_tabs_system(
                             LogCategory::UI,
                             "Remove parents event - dropped on empty space"
                         );
-                        remove_parents_event_writer.send(RequestRemoveParentsFromEntities {
+                        remove_parents_event_writer.write(RequestRemoveParentsFromEntities {
                             entities: dragged_entities,
                         });
                     } else if is_valid_drop(&dragged_entities, drop_target, &data.hierarchy) {
@@ -224,7 +261,7 @@ pub fn update_node_tree_tabs_system(
                             LogCategory::UI,
                             "Drag parent event"
                         );
-                        reparent_event_writer.send(RequestReparentEntityEvent {
+                        reparent_event_writer.write(RequestReparentEntityEvent {
                             entities: dragged_entities,
                             new_parent: drop_target,
                         });
@@ -278,42 +315,33 @@ pub fn is_descendant_of(
     false
 }
 
-fn detect_changes(
-    hierarchy_query: &Query<
-        (Entity, &Name, Option<&Parent>, Option<&IdentityData>),
-        (
-            Without<GizmoParent>,
-            Without<GizmoMesh>,
-            Without<TreeHiddenEntity>,
-        ),
-    >,
-    changed_hierarchy: &Query<
-        Entity,
-        (
-            Or<(Changed<Name>, Changed<IdentityData>)>,
-            Without<GizmoParent>,
-            Without<GizmoMesh>,
-            Without<TreeHiddenEntity>,
-        ),
-    >,
+fn detect_changes<'a>(
+    hierarchy_query: impl Iterator<
+            Item = (
+                Entity,
+                &'a Name,
+                Option<&'a ChildOf>,
+                Option<&'a IdentityData>,
+            ),
+        > + Clone,
+    changed_hierarchy: bool,
     data: &NodeTreeTabData,
 ) -> (bool, bool, bool) {
     use std::collections::HashSet;
-    
-    let current_entities: HashSet<Entity> =
-        hierarchy_query.iter().map(|(e, _, _, _)| e).collect();
+
+    let current_entities: HashSet<Entity> = hierarchy_query.clone().map(|(e, _, _, _)| e).collect();
     let existing_entities: HashSet<Entity> =
         data.hierarchy.iter().map(|entry| entry.entity).collect();
 
     // Check if entities changed OR if any existing entity had its data changed OR if parent relationships changed
     let entities_changed = current_entities != existing_entities;
-    let data_changed = !changed_hierarchy.is_empty();
-    
+    let data_changed = changed_hierarchy;
+
     // Also check if any parent relationships changed by comparing current vs stored hierarchy
     let hierarchy_changed = if !entities_changed {
-        hierarchy_query.iter().any(|(entity, _, parent, _)| {
+        hierarchy_query.into_iter().any(|(entity, _, relation, _)| {
             if let Some(entry) = data.hierarchy.iter().find(|e| e.entity == entity) {
-                let current_parent = parent.map(|p| p.get());
+                let current_parent = relation.map(|p| p.parent());
                 entry.parent != current_parent
             } else {
                 true // Entity not found in stored hierarchy
@@ -328,26 +356,29 @@ fn detect_changes(
 
 fn build_visual_order(hierarchy: &[HierarchyEntry]) -> Vec<Entity> {
     use std::collections::HashMap;
-    
+
     // Build parent -> children map
     let mut children_map: HashMap<Option<Entity>, Vec<Entity>> = HashMap::new();
     for entry in hierarchy {
-        children_map.entry(entry.parent).or_default().push(entry.entity);
+        children_map
+            .entry(entry.parent)
+            .or_default()
+            .push(entry.entity);
     }
-    
+
     // Sort children by entity index to maintain consistent order
     for children in children_map.values_mut() {
         children.sort_by_key(|entity| entity.index());
     }
-    
+
     // Build expansion state map
     let expanded_map: HashMap<Entity, bool> = hierarchy
         .iter()
         .map(|entry| (entry.entity, entry.is_expanded))
         .collect();
-    
+
     let mut visual_order = Vec::new();
-    
+
     // Recursive function to build visual order
     fn add_visible_children(
         parent: Option<Entity>,
@@ -358,7 +389,7 @@ fn build_visual_order(hierarchy: &[HierarchyEntry]) -> Vec<Entity> {
         if let Some(children) = children_map.get(&parent) {
             for &child in children {
                 visual_order.push(child);
-                
+
                 // Only add children if this node is expanded
                 if expanded_map.get(&child).copied().unwrap_or(false) {
                     add_visible_children(Some(child), children_map, expanded_map, visual_order);
@@ -366,27 +397,27 @@ fn build_visual_order(hierarchy: &[HierarchyEntry]) -> Vec<Entity> {
             }
         }
     }
-    
+
     // Start with root nodes (parent = None)
     add_visible_children(None, &children_map, &expanded_map, &mut visual_order);
-    
+
     visual_order
 }
 
-fn update_hierarchy_data(
+fn update_hierarchy_data<'a>(
     data: &mut NodeTreeTabData,
-    hierarchy_query: &Query<
-        (Entity, &Name, Option<&Parent>, Option<&IdentityData>),
-        (
-            Without<GizmoParent>,
-            Without<GizmoMesh>,
-            Without<TreeHiddenEntity>,
+    hierarchy_query: impl IntoIterator<
+        Item = (
+            Entity,
+            &'a Name,
+            Option<&'a ChildOf>,
+            Option<&'a IdentityData>,
         ),
     >,
     hierarchy_changed: bool,
 ) {
     use std::collections::HashMap;
-    
+
     if hierarchy_changed {
         log!(
             LogType::Editor,
@@ -402,14 +433,14 @@ fn update_hierarchy_data(
         .collect();
 
     let mut hierarchy_entries: Vec<HierarchyEntry> = hierarchy_query
-        .iter()
-        .map(|(entity, name, parent, identity)| HierarchyEntry {
+        .into_iter()
+        .map(|(entity, name, relation, identity)| HierarchyEntry {
             entity,
             name: name.to_string(),
             entity_type: identity
                 .map(|id| id.class.type_abv())
                 .unwrap_or_else(|| "Unknown".to_string()),
-            parent: parent.map(|p| p.get()),
+            parent: relation.map(|r| r.parent()),
             is_expanded: existing_expanded.get(&entity).copied().unwrap_or(false),
         })
         .collect();

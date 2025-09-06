@@ -15,7 +15,7 @@ mod ui;
 pub use camera::GizmoCamera;
 pub use gizmos::{
     despawn_rotate_gizmo, GizmoChildren, GizmoMesh, GizmoSnap, GizmoType, RotateGizmo,
-    SelectedGizmo, TransformGizmo,
+    NewGizmoConfig, TransformGizmo,
 };
 pub use input::{watch_gizmo_change, DragState, GizmoAxis};
 pub use selection::{

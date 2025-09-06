@@ -2,8 +2,9 @@
 // Children inherit rotation automatically through hierarchy
 use crate::{
     gizmos::{
-        GizmoMesh, GizmoOf, GizmoSnap, GizmoType, RotateDraggingEvent, RotateGizmo,
-        RotateGizmoParent, RotateInitDragEvent, RotateResetDragEvent, SelectedGizmo,
+        GizmoConfig, GizmoMesh, GizmoOf, GizmoSnap, GizmoType, NewGizmoConfig, NewGizmoType,
+        RotateDraggingEvent, RotateGizmo, RotateGizmoParent, RotateInitDragEvent,
+        RotateResetDragEvent,
     },
     input::{DragState, GizmoAxis},
     selection::{
@@ -14,14 +15,17 @@ use crate::{
 };
 use bevy::{
     ecs::{observer::Trigger, query::Changed, system::Local},
+    math::primitives::InfinitePlane3d,
     picking::{
         events::{Drag, Pointer, Pressed},
         hover::PickingInteraction,
+        pointer::PointerButton,
     },
     prelude::{
         ChildOf, Children, Entity, EventReader, EventWriter, GlobalTransform, Mut, Name, ParamSet,
         Quat, Query, Res, ResMut, Transform, Vec2, Vec3, Visibility, With, Without,
     },
+    render::camera::Camera,
 };
 use bevy_granite_core::{CursorWindowPos, IconProxy, UserInput};
 use bevy_granite_logging::{
@@ -59,7 +63,7 @@ type ChildrenQuery<'w, 's> = Query<'w, 's, &'w Children>;
 
 pub fn handle_rotate_input(
     drag_state: ResMut<DragState>,
-    selected_option: ResMut<SelectedGizmo>,
+    selected_option: ResMut<NewGizmoType>,
     user_input: Res<UserInput>,
     selection_query: Query<Entity, With<ActiveSelection>>,
     mut init_drag_event: EventWriter<RotateInitDragEvent>,
@@ -70,7 +74,7 @@ pub fn handle_rotate_input(
         return;
     }
 
-    if !matches!(selected_option.value, GizmoType::Rotate) {
+    if !matches!(**selected_option, GizmoType::Rotate) {
         // Gizmo value for Rotate
         return;
     }
@@ -246,239 +250,161 @@ fn hide_unselected_axes(
 }
 
 pub fn handle_rotate_dragging(
-    mut events: EventReader<RotateDraggingEvent>,
-    resources: (
-        Res<GizmoSnap>,
-        ResMut<DragState>,
-        Res<CursorWindowPos>,
-        Res<SelectedGizmo>,
-    ),
-    mut queries: ParamSet<(
-        CameraQuery,
-        ActiveSelectionQuery,
-        NonActiveSelectionQuery,
-        TransformQuery,
-        RotateGizmoQueryWTransform,
-        ChildrenQuery,
-        ParentQuery, // Add parent query
-    )>,
-) {
-    return;
-    let (gizmo_snap, mut drag_state, cursor_2d, selected_gizmo) = resources;
-    let gizmo_distance_scale = selected_gizmo.speed_scale;
-    let free_rotate_speed = 0.3 * gizmo_distance_scale;
-    let locked_rotate_speed = 1.15 * gizmo_distance_scale;
-
-    // let ray_direction = ray.direction;
-    // let ray_origin = ray.origin;
-
-    for _ in events.read() {
-        let snap_value = gizmo_snap.rotate_value.to_radians();
-        let snap = |value: f32| {
-            if snap_value == 0.0 {
-                value
-            } else {
-                (value / snap_value).round() * snap_value
-            }
-        };
-
-        let Some(gizmo_axis) = drag_state.locked_axis else {
-            return;
-        };
-
-        // Get all selected entities
-        let selection_entity = match queries.p1().single() {
-            Ok(e) => e,
-            Err(_) => return,
-        };
-
-        let mut all_selected_entities: Vec<Entity> = queries.p2().iter().collect();
-        all_selected_entities.push(selection_entity);
-
-        // Free rotate
-        if gizmo_axis == GizmoAxis::All {
-            return;
-            let cursor_delta_2d = cursor_2d.position - drag_state.initial_cursor_position;
-            if cursor_delta_2d == Vec2::ZERO {
-                return;
-            }
-            let delta_pixels = cursor_delta_2d.length();
-            let delta_degrees = delta_pixels * 90.0;
-            let delta_angle_radians = delta_degrees.to_radians();
-            drag_state.accumulated_angle += delta_angle_radians;
-            let snapped_angle = snap(drag_state.accumulated_angle);
-            let delta_angle = snapped_angle - drag_state.last_snapped;
-            if delta_angle.abs() < f32::EPSILON {
-                return;
-            }
-            drag_state.last_snapped = snapped_angle;
-
-            let camera_query = queries.p0();
-            if let Ok(camera_transform) = camera_query.single() {
-                let camera_right = camera_transform.rotation * Vec3::X;
-                let camera_up = camera_transform.rotation * Vec3::Y;
-                let yaw = cursor_delta_2d.x * free_rotate_speed;
-                let pitch = -cursor_delta_2d.y * free_rotate_speed;
-                let rotation_delta = Quat::from_axis_angle(camera_up, yaw)
-                    * Quat::from_axis_angle(camera_right, pitch);
-
-                // Apply rotation to each entity independently
-                apply_independent_rotation(&mut queries, &all_selected_entities, rotation_delta);
-
-                // Update gizmo
-                let final_rotation =
-                    if let Ok((transform, _, _)) = queries.p3().get(selection_entity) {
-                        transform.rotation
-                    } else {
-                        Quat::IDENTITY
-                    };
-
-                if let Ok((_, mut gizmo_transform, _)) = queries.p4().single_mut() {
-                    gizmo_transform.rotation =
-                        drag_state.initial_gizmo_rotation * final_rotation.inverse();
-                }
-            }
-            return;
-        }
-
-        // Locked rotate
-        let axis = match gizmo_axis {
-            GizmoAxis::X => Vec3::X,
-            GizmoAxis::Y => Vec3::Y,
-            GizmoAxis::Z => Vec3::Z,
-            _ => return,
-        };
-
-        let origin = drag_state.gizmo_position;
-        let plane_normal = axis;
-        // let ray_dir_dot = ray_direction.dot(plane_normal);
-        // if ray_dir_dot.abs() < 1e-6 {
-        //     return;
-        // }
-
-        // let t = (origin - ray_origin).dot(plane_normal) / ray_dir_dot;
-        // let hit_pos = ray_origin + ray_direction * t;
-        // let prev_vec = drag_state.prev_hit_dir;
-        // let curr_vec = (hit_pos - origin).normalize();
-        // let unsigned_angle = prev_vec.angle_between(curr_vec);
-
-        // let direction = prev_vec.cross(curr_vec).dot(axis).signum();
-
-        // let signed_angle = unsigned_angle * direction;
-        // let adjusted_angle = signed_angle * locked_rotate_speed;
-        // let new_accum = drag_state.accumulated_angle + adjusted_angle;
-        // let snapped = snap(new_accum);
-        // let delta_angle = snapped - drag_state.last_snapped;
-
-        // if delta_angle.abs() < f32::EPSILON {
-        //     return;
-        // }
-
-        // drag_state.last_snapped = snapped;
-        // drag_state.accumulated_angle = new_accum;
-        // drag_state.prev_hit_dir = curr_vec;
-
-        // let rotation_delta = Quat::from_axis_angle(axis, delta_angle);
-
-        // Apply rotation to each entity independently
-        // apply_independent_rotation(&mut queries, &all_selected_entities, rotation_delta);
-
-        // Update gizmo
-        let final_rotation = if let Ok((transform, _, _)) = queries.p3().get(selection_entity) {
-            transform.rotation
-        } else {
-            Quat::IDENTITY
-        };
-
-        if let Ok((_, mut gizmo_transform, _)) = queries.p4().single_mut() {
-            gizmo_transform.rotation = drag_state.initial_gizmo_rotation * final_rotation.inverse();
-        }
-    }
-}
-
-pub fn debug_handle_rotate_dragging<const AXIS: char>(
-    drag: Trigger<Pointer<Drag>>,
+    event: Trigger<Pointer<Drag>>,
     targets: Query<&GizmoOf>,
-    camera_query: Query<&Transform, With<GizmoCamera>>,
+    camera_query: Query<(&GlobalTransform, &Camera), With<GizmoCamera>>,
     mut objects: Query<&mut Transform, Without<GizmoCamera>>,
     gizmo_snap: Res<GizmoSnap>,
-    selected: Res<SelectedGizmo>,
+    selected: Res<NewGizmoConfig>,
+    gizmo_data: Query<(&GizmoAxis, Option<&GizmoConfig>)>,
     mut accrued: Local<Vec2>,
 ) {
-    let gizmo_distance_scale = selected.speed_scale;
-    let free_rotate_speed = 0.3 * gizmo_distance_scale;
-
-    let gizmo_axis = match AXIS {
-        'X' | 'x' => GizmoAxis::X,
-        'Y' | 'y' => GizmoAxis::Y,
-        'Z' | 'z' => GizmoAxis::Z,
-        'A' | 'a' => GizmoAxis::All,
-        _ => GizmoAxis::All,
+    // return if not dragging with primary button
+    if event.button != PointerButton::Primary {
+        return;
+    }
+    let Ok((gizmo_axis, config)) = gizmo_data.get(event.target) else {
+        log!(
+            LogType::Editor,
+            LogLevel::Warning,
+            LogCategory::Input,
+            "Gizmo Axis data not found for Gizmo entity {:?}",
+            event.target
+        );
+        return;
     };
-    *accrued += drag.delta * free_rotate_speed;
+    let GizmoConfig::Rotate {
+        speed_scale,
+        distance_scale,
+        mode,
+    } = config.cloned().unwrap_or(selected.rotation())
+    else {
+        log!(
+            LogType::Editor,
+            LogLevel::Warning,
+            LogCategory::Input,
+            "Gizmo Config for rotation was not a Rotation Config",
+        );
+        return;
+    };
+
+    let free_rotate_speed = 0.3 * speed_scale;
+
+    *accrued += event.delta * free_rotate_speed;
     if accrued.x.abs() < gizmo_snap.rotate_value && accrued.y.abs() < gizmo_snap.rotate_value {
         return;
     }
     let x_step = snap_roation(accrued.x, gizmo_snap.rotate_value);
     let y_step = snap_roation(accrued.y, gizmo_snap.rotate_value);
-    *accrued = Vec2::ZERO;
     let delta_x = x_step.to_radians();
     let delta_y = y_step.to_radians();
-    let delta_z = if x_step.abs() > y_step.abs() {
-        delta_x
-    } else {
-        delta_y
-    };
-    let Ok(target) = targets.get(drag.target) else {
+    let Ok(target) = targets.get(event.target) else {
         log(
             LogType::Editor,
             LogLevel::Error,
             LogCategory::Debug,
-            format!("Rotaion Gizmo({})'s Target not found", drag.target.index()),
+            format!("Rotaion Gizmo({})'s Target not found", event.target.index()),
+        );
+        return;
+    };
+    let Ok((camera_transform, camera)) = camera_query.single() else {
+        log!(
+            LogType::Editor,
+            LogLevel::Error,
+            LogCategory::Debug,
+            "Gizmo Camera not found for rotation drag"
+        );
+        return;
+    };
+    let rotation_delta = Quat::from_axis_angle(camera_transform.up().as_vec3(), delta_x)
+        * Quat::from_axis_angle(camera_transform.right().as_vec3(), delta_y);
+    let Ok(click_ray) = camera.viewport_to_world(camera_transform, event.pointer_location.position)
+    else {
+        log! {
+            LogType::Editor,
+            LogLevel::Error,
+            LogCategory::Input,
+            "Failed to convert viewport to world coordinates for pointer location: {:?}",
+            event.pointer_location.position
+        };
+        return;
+    };
+    let (pitch, roll, yaw) = rotation_delta.to_euler(bevy::math::EulerRot::XZY);
+    let Ok(mut transform) = objects.get_mut(**target) else {
+        log!(
+            LogType::Editor,
+            LogLevel::Error,
+            LogCategory::Debug,
+            "Target entity {:?} missing Transform for rotation drag",
+            **target
         );
         return;
     };
     match gizmo_axis {
         GizmoAxis::All => {
-            if let Ok(camera_transform) = camera_query.single() {
-                let camera_right = camera_transform.right().as_vec3();
-                let camera_up = camera_transform.up().as_vec3();
-                let rotation_delta = Quat::from_axis_angle(camera_up, delta_x)
-                    * Quat::from_axis_angle(camera_right, delta_y);
-
-                // Apply rotation to each entity independently
-                // apply_independent_rotation(&mut queries, &all_selected_entities, rotation_delta);
-
-                if let Ok(mut transform) = objects.get_mut(**target) {
-                    transform.rotate(rotation_delta);
-                }
-            }
+            transform.rotate(rotation_delta);
         }
         GizmoAxis::X => {
-            if let Ok(mut transform) = objects.get_mut(**target) {
-                transform.rotate(Quat::from_axis_angle(Vec3::X, delta_z));
+            let mut delta = pitch;
+            if let Some(hit_distance) = click_ray.intersect_plane(
+                Vec3::new(transform.translation.x, 0., 0.),
+                InfinitePlane3d::new(Vec3::X),
+            ) {
+                let hit_point = camera_transform.translation() + click_ray.direction * hit_distance;
+                let z_diff = transform.translation.z - hit_point.z;
+                let y_diff = transform.translation.y - hit_point.y;
+                delta += roll * z_diff.signum();
+                delta += yaw * y_diff.signum();
             }
+            if transform.translation.x > camera_transform.translation().x {
+                delta = -delta;
+            }
+            transform.rotate_x(delta);
         }
         GizmoAxis::Y => {
-            if let Ok(mut transform) = objects.get_mut(**target) {
-                transform.rotate(Quat::from_axis_angle(Vec3::Y, delta_z));
+            let mut delta = yaw;
+            if let Some(hit_distance) = click_ray.intersect_plane(
+                Vec3::new(0., transform.translation.y, 0.),
+                InfinitePlane3d::new(Vec3::Y),
+            ) {
+                let hit_point = camera_transform.translation() + click_ray.direction * hit_distance;
+                let z_diff = transform.translation.z - hit_point.z;
+                let x_diff = transform.translation.x - hit_point.x;
+                delta += pitch * x_diff.signum();
+                delta += roll * z_diff.signum();
             }
+            if transform.translation.y > camera_transform.translation().y {
+                delta = -delta;
+            }
+            transform.rotate_y(delta);
         }
         GizmoAxis::Z => {
-            if let Ok(mut transform) = objects.get_mut(**target) {
-                transform.rotate(Quat::from_axis_angle(Vec3::Z, delta_z));
+            let mut delta = roll;
+            if let Some(hit_distance) = click_ray.intersect_plane(
+                Vec3::new(0., 0., transform.translation.z),
+                InfinitePlane3d::new(Vec3::Z),
+            ) {
+                let hit_point = camera_transform.translation() + click_ray.direction * hit_distance;
+                let y_diff = transform.translation.y - hit_point.y;
+                let x_diff = transform.translation.x - hit_point.x;
+                delta += yaw * y_diff.signum();
+                delta += pitch * x_diff.signum();
             }
+            if transform.translation.z > camera_transform.translation().z {
+                delta = -delta;
+            }
+            transform.rotate_z(delta);
         }
-        _ => {
+        GizmoAxis::None => {
             log!(
                 LogType::Editor,
-                LogLevel::Critical,
+                LogLevel::Error,
                 LogCategory::Debug,
-                "Rotation Gizmo Axis not implemented for axis {:?}",
-                gizmo_axis
+                "Rotation Gizmo Axis None Should not happen",
             )
         }
     }
+    *accrued = Vec2::ZERO;
 }
 
 fn snap_roation(value: f32, inc: f32) -> f32 {

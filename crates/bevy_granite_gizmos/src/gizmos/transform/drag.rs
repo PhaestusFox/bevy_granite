@@ -34,9 +34,8 @@ pub fn drag_transform_gizmo(
     gizmo_data: Query<(&GizmoAxis, &TransformGizmo)>,
     user_input: Res<UserInput>,
 ) {
-    // Middle mouse button while dragging on axis can get is in a weird state
-    // not sure why... but this fixes it
-    if user_input.mouse_middle.any {
+    // Only drag with Primary Input drags
+    if event.button != bevy::picking::pointer::PointerButton::Primary {
         return;
     }
     let Ok((axis, typ)) = gizmo_data.get(event.target) else {
@@ -110,7 +109,7 @@ pub fn drag_transform_gizmo(
             ) else {
                 return;
             };
-            let hit = camera_transform.translation() - (click_ray.direction * -click_distance);
+            let hit = camera_transform.translation() + (click_ray.direction * click_distance);
             let delta_x = snap_gizmo(hit.x, gizmo_snap.transform_value) - current_world_pos.x;
 
             if let Ok(parent) = parents.get(*target) {

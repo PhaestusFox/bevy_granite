@@ -9,7 +9,9 @@ use bevy::{
     transform::components::GlobalTransform,
 };
 use bevy_granite_core::UICamera;
-use bevy_granite_gizmos::{ActiveSelection, DragState, GizmoType, Selected, SelectedGizmo};
+use bevy_granite_gizmos::{
+    gizmos::NewGizmoType, ActiveSelection, DragState, GizmoType, Selected,
+};
 
 pub fn update_icon_entities_system(
     mut icon_query: Query<
@@ -22,7 +24,7 @@ pub fn update_icon_entities_system(
         With<IconEntity>,
     >,
     drag_state: Res<DragState>,
-    selected_gizmo: Res<SelectedGizmo>,
+    selected_gizmo: Res<NewGizmoType>,
     active_query: Query<Entity, With<ActiveSelection>>,
     mut selected_query: Query<Entity, (With<Selected>, Without<ActiveSelection>)>,
     target_query: Query<&GlobalTransform, Without<IconEntity>>,
@@ -30,7 +32,7 @@ pub fn update_icon_entities_system(
     mut materials: ResMut<Assets<StandardMaterial>>,
     editor_state: Res<EditorState>,
 ) {
-    let rotating = drag_state.dragging && matches!(selected_gizmo.value, GizmoType::Rotate);
+    let rotating = drag_state.dragging && matches!(**selected_gizmo, GizmoType::Rotate);
     if !editor_state.active {
         // Hide all icons when editor is disabled
         for (_, _, mut visibility, _) in icon_query.iter_mut() {

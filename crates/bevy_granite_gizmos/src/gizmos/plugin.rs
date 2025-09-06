@@ -2,10 +2,11 @@ use super::register_embedded_rotate_gizmo_mesh;
 use super::{
     gizmo_changed_watcher, gizmo_events, handle_init_rotate_drag, handle_rotate_dragging,
     handle_rotate_input, handle_rotate_reset, scale_gizmo_by_camera_distance_system,
-    DespawnGizmoEvent, GizmoSnap, GizmoType, LastSelectedGizmo, PreviousTransformGizmo,
-    RotateDraggingEvent, RotateInitDragEvent, RotateResetDragEvent, SelectedGizmo, SpawnGizmoEvent,
-    TransformDraggingEvent, TransformInitDragEvent, TransformResetDragEvent,
+    DespawnGizmoEvent, GizmoSnap, GizmoType, LastSelectedGizmo, NewGizmoConfig,
+    PreviousTransformGizmo, RotateDraggingEvent, RotateInitDragEvent, RotateResetDragEvent,
+    SpawnGizmoEvent, TransformDraggingEvent, TransformInitDragEvent, TransformResetDragEvent,
 };
+use crate::gizmos::{GizmoMode, NewGizmoType};
 use crate::is_gizmos_active;
 use bevy::{
     app::{App, Plugin, PostUpdate, Startup, Update},
@@ -23,11 +24,12 @@ impl Plugin for GizmoPlugin {
             .insert_resource(LastSelectedGizmo {
                 value: GizmoType::default(),
             })
-            .insert_resource(SelectedGizmo(super::GizmoConfig {
-                value: GizmoType::Pointer,
-                speed_scale: 1.0,
-                distance_scale: 1.0,
-            }))
+            .insert_resource(NewGizmoConfig {
+                speed_scale: 1.,
+                distance_scale: 1.,
+                mode: GizmoMode::Global,
+            })
+            .insert_resource(NewGizmoType(GizmoType::Pointer))
             .insert_resource(GizmoSnap {
                 transform_value: 0.,
                 rotate_value: 0.,
@@ -57,8 +59,7 @@ impl Plugin for GizmoPlugin {
                     // Rotate gizmo
                     handle_rotate_input,
                     handle_init_rotate_drag.after(handle_rotate_input),
-                    handle_rotate_dragging.after(handle_init_rotate_drag),
-                    handle_rotate_reset.after(handle_rotate_dragging),
+                    handle_rotate_reset.after(handle_rotate_input),
                 )
                     .run_if(is_gizmos_active),
             )

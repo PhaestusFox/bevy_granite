@@ -14,7 +14,7 @@ use bevy_granite_logging::{
     log,
 };
 
-use crate::gizmos::GizmoOf;
+use crate::gizmos::{GizmoConfig, GizmoOf};
 use crate::{gizmos::GizmoMesh, input::GizmoAxis};
 
 #[derive(Component)]
@@ -51,6 +51,7 @@ pub fn spawn_rotate_gizmo(
     commands: &mut Commands,
     materials: &mut ResMut<Assets<StandardMaterial>>,
     meshes: &mut ResMut<Assets<Mesh>>,
+    config: GizmoConfig,
 ) {
     let offset = Vec3::new(0., 0., 0.);
 
@@ -87,6 +88,7 @@ pub fn spawn_rotate_gizmo(
                 Visibility::default(),
                 GizmoOf(parent),
                 ChildOf(parent),
+                config,
             ))
             .insert(Name::new("RotateGizmo"))
             .insert(RotateGizmo)
@@ -100,35 +102,34 @@ pub fn spawn_rotate_gizmo(
             commands,
             materials,
             gizmo_entity,
-            GizmoAxis::All,
             Color::srgba(1., 1., 0.0, 1.),
             meshes,
         );
 
-        build_axis_ring::<'x'>(
+        build_axis_ring(
             parent,
             commands,
             materials,
             gizmo_entity,
-            Vec3::X,
+            GizmoAxis::X,
             Color::srgba(1., 0., 0., 1.0),
         );
 
-        build_axis_ring::<'y'>(
+        build_axis_ring(
             parent,
             commands,
             materials,
             gizmo_entity,
-            Vec3::Y,
+            GizmoAxis::Y,
             Color::srgba(0., 1., 0., 1.),
         );
 
-        build_axis_ring::<'z'>(
+        build_axis_ring(
             parent,
             commands,
             materials,
             gizmo_entity,
-            Vec3::Z,
+            GizmoAxis::Z,
             Color::srgba(0., 0., 1., 1.),
         );
 
@@ -169,7 +170,6 @@ fn build_free_sphere(
     commands: &mut Commands,
     materials: &mut ResMut<Assets<StandardMaterial>>,
     parent: Entity,
-    axis: GizmoAxis,
     color: Color,
     meshes: &mut ResMut<Assets<Mesh>>,
 ) {
@@ -190,30 +190,23 @@ fn build_free_sphere(
             NotShadowCaster,
             NotShadowReceiver,
             Name::new("Gizmo Rotate Sphere"),
-            axis,
+            GizmoAxis::All,
             RotateGizmo,
             GizmoMesh,
             ChildOf(parent),
             GizmoOf(target),
         ))
-        .observe(super::drag::debug_handle_rotate_dragging::<'a'>);
+        .observe(super::drag::handle_rotate_dragging);
 }
 
-fn build_axis_ring<const C: char>(
+fn build_axis_ring(
     target: Entity,
     commands: &mut Commands,
     materials: &mut ResMut<Assets<StandardMaterial>>,
     parent: Entity,
-    axis: Vec3,
+    axis: GizmoAxis,
     color: Color,
 ) {
-    let gizmo_axis = match axis {
-        Vec3::X => GizmoAxis::X,
-        Vec3::Y => GizmoAxis::Y,
-        Vec3::Z => GizmoAxis::Z,
-        _ => GizmoAxis::None,
-    };
-
     // Load the embedded ring mesh
     let ring_mesh = get_mesh_handle();
 
@@ -225,9 +218,9 @@ fn build_axis_ring<const C: char>(
     });
 
     let rotation = match axis {
-        Vec3::X => Quat::from_rotation_y(std::f32::consts::FRAC_PI_2),
-        Vec3::Y => Quat::from_rotation_x(std::f32::consts::FRAC_PI_2),
-        Vec3::Z => Quat::from_rotation_z(std::f32::consts::FRAC_PI_2),
+        GizmoAxis::X => Quat::from_rotation_y(std::f32::consts::FRAC_PI_2),
+        GizmoAxis::Y => Quat::from_rotation_x(std::f32::consts::FRAC_PI_2),
+        GizmoAxis::Z => Quat::from_rotation_z(std::f32::consts::FRAC_PI_2),
         _ => Quat::IDENTITY,
     };
 
@@ -243,11 +236,11 @@ fn build_axis_ring<const C: char>(
             NotShadowCaster,
             NotShadowReceiver,
             Name::new("Gizmo Rotate Ring"),
-            gizmo_axis,
+            axis,
             RotateGizmo,
             GizmoMesh,
             GizmoOf(target),
             ChildOf(parent),
         ))
-        .observe(super::drag::debug_handle_rotate_dragging::<C>);
+        .observe(super::drag::handle_rotate_dragging);
 }

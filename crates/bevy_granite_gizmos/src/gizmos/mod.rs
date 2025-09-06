@@ -20,14 +20,101 @@ pub enum GizmoType {
     None,
 }
 
-#[derive(Resource, Deref, DerefMut)]
-pub struct SelectedGizmo(GizmoConfig);
+#[derive(Resource, Deref, DerefMut, Clone, Copy)]
+pub struct NewGizmoType(pub GizmoType);
 
-#[derive(Component)]
-pub struct GizmoConfig {
-    pub value: GizmoType,
+#[derive(Clone, Default, Debug, Copy, PartialEq)]
+pub enum GizmoMode {
+    Local,
+    #[default]
+    Global,
+}
+
+#[derive(Resource)]
+pub struct NewGizmoConfig {
     pub speed_scale: f32,
     pub distance_scale: f32,
+    pub mode: GizmoMode,
+}
+
+impl NewGizmoConfig {
+    pub fn rotation(&self) -> GizmoConfig {
+        GizmoConfig::Rotate {
+            speed_scale: self.speed_scale,
+            distance_scale: self.distance_scale,
+            mode: self.mode,
+        }
+    }
+    pub fn transform(&self) -> GizmoConfig {
+        GizmoConfig::Transform {
+            distance_scale: self.distance_scale,
+            mode: self.mode,
+        }
+    }
+}
+
+#[derive(Component, Clone, Copy)]
+pub enum GizmoConfig {
+    Pointer,
+    None,
+    Rotate {
+        speed_scale: f32,
+        distance_scale: f32,
+        mode: GizmoMode,
+    },
+    Transform {
+        distance_scale: f32,
+        mode: GizmoMode,
+    },
+}
+
+impl GizmoConfig {
+    pub fn gizmo_type(&self) -> GizmoType {
+        match self {
+            GizmoConfig::Pointer => GizmoType::Pointer,
+            GizmoConfig::None => GizmoType::None,
+            GizmoConfig::Rotate { .. } => GizmoType::Rotate,
+            GizmoConfig::Transform { .. } => GizmoType::Transform,
+        }
+    }
+
+    pub fn mode(&self) -> GizmoMode {
+        match self {
+            GizmoConfig::Pointer => GizmoMode::Global,
+            GizmoConfig::None => GizmoMode::Global,
+            GizmoConfig::Rotate { mode, .. } => *mode,
+            GizmoConfig::Transform { mode, .. } => *mode,
+        }
+    }
+
+    pub fn set_type(&mut self, new_type: GizmoType, default_config: &NewGizmoConfig) {
+        *self = match new_type {
+            GizmoType::Pointer => GizmoConfig::Pointer,
+            GizmoType::None => GizmoConfig::None,
+            GizmoType::Rotate => GizmoConfig::Rotate {
+                speed_scale: default_config.speed_scale,
+                distance_scale: default_config.distance_scale,
+                mode: default_config.mode,
+            },
+            GizmoType::Transform => GizmoConfig::Transform {
+                distance_scale: default_config.distance_scale,
+                mode: default_config.mode,
+            },
+        }
+    }
+
+    pub fn set_mode(&mut self, new_mode: GizmoMode) {
+        match self {
+            GizmoConfig::Pointer => {}
+            GizmoConfig::None => {}
+            GizmoConfig::Rotate { ref mut mode, .. } => {
+                *mode = new_mode;
+            }
+            GizmoConfig::Transform { ref mut mode, .. } => {
+                *mode = new_mode;
+            }
+        }
+    }
 }
 
 #[derive(Resource)]
@@ -95,6 +182,6 @@ pub use rotate::{
     RotateGizmoParent,
 };
 pub use transform::{
-    despawn_transform_gizmo, spawn_transform_gizmo, PreviousTransformGizmo,
-    TransformGizmo, TransformGizmoParent,
+    despawn_transform_gizmo, spawn_transform_gizmo, PreviousTransformGizmo, TransformGizmo,
+    TransformGizmoParent,
 };

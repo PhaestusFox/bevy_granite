@@ -1,5 +1,6 @@
 use bevy::{
     ecs::hierarchy::{ChildOf, Children},
+    gizmos::config,
     pbr::{MeshMaterial3d, NotShadowCaster, NotShadowReceiver},
     prelude::{
         AlphaMode, Assets, Color, Commands, Component, Cone, Cylinder, Entity, GlobalTransform,
@@ -14,7 +15,7 @@ use bevy_granite_logging::{
 };
 
 use crate::{
-    gizmos::{GizmoMesh, GizmoOf, GizmoRoot},
+    gizmos::{GizmoConfig, GizmoMesh, GizmoOf, GizmoRoot},
     input::GizmoAxis,
 };
 
@@ -46,6 +47,7 @@ pub fn spawn_transform_gizmo(
     commands: &mut Commands,
     meshes: &mut ResMut<Assets<Mesh>>,
     materials: &mut ResMut<Assets<StandardMaterial>>,
+    config: GizmoConfig,
 ) {
     let offset = Vec3::new(0., 0., 0.);
 
@@ -65,6 +67,7 @@ pub fn spawn_transform_gizmo(
                 Visibility::default(),
                 GizmoOf(parent),
                 ChildOf(parent),
+                config,
             ))
             .insert(Name::new("TransformGizmo"))
             .insert(TransformGizmoParent)

@@ -14,7 +14,7 @@ use bevy_granite_logging::{
     log,
 };
 
-use crate::gizmos::GizmoOf;
+use crate::gizmos::{GizmoConfig, GizmoOf};
 use crate::{gizmos::GizmoMesh, input::GizmoAxis};
 
 #[derive(Component)]
@@ -51,6 +51,7 @@ pub fn spawn_rotate_gizmo(
     commands: &mut Commands,
     materials: &mut ResMut<Assets<StandardMaterial>>,
     meshes: &mut ResMut<Assets<Mesh>>,
+    config: GizmoConfig,
 ) {
     let offset = Vec3::new(0., 0., 0.);
 
@@ -87,6 +88,7 @@ pub fn spawn_rotate_gizmo(
                 Visibility::default(),
                 GizmoOf(parent),
                 ChildOf(parent),
+                config,
             ))
             .insert(Name::new("RotateGizmo"))
             .insert(RotateGizmo)

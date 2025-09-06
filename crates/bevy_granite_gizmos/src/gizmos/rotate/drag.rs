@@ -2,8 +2,9 @@
 // Children inherit rotation automatically through hierarchy
 use crate::{
     gizmos::{
-        GizmoMesh, GizmoOf, GizmoSnap, GizmoType, RotateDraggingEvent, RotateGizmo,
-        RotateGizmoParent, RotateInitDragEvent, RotateResetDragEvent, SelectedGizmo,
+        GizmoConfig, GizmoMesh, GizmoOf, GizmoSnap, GizmoType, NewGizmoConfig, NewGizmoType,
+        RotateDraggingEvent, RotateGizmo, RotateGizmoParent, RotateInitDragEvent,
+        RotateResetDragEvent,
     },
     input::{DragState, GizmoAxis},
     selection::{
@@ -62,7 +63,7 @@ type ChildrenQuery<'w, 's> = Query<'w, 's, &'w Children>;
 
 pub fn handle_rotate_input(
     drag_state: ResMut<DragState>,
-    selected_option: ResMut<SelectedGizmo>,
+    selected_option: ResMut<NewGizmoType>,
     user_input: Res<UserInput>,
     selection_query: Query<Entity, With<ActiveSelection>>,
     mut init_drag_event: EventWriter<RotateInitDragEvent>,
@@ -73,7 +74,7 @@ pub fn handle_rotate_input(
         return;
     }
 
-    if !matches!(selected_option.value, GizmoType::Rotate) {
+    if !matches!(**selected_option, GizmoType::Rotate) {
         // Gizmo value for Rotate
         return;
     }
@@ -254,18 +255,15 @@ pub fn handle_rotate_dragging(
     camera_query: Query<(&GlobalTransform, &Camera), With<GizmoCamera>>,
     mut objects: Query<&mut Transform, Without<GizmoCamera>>,
     gizmo_snap: Res<GizmoSnap>,
-    selected: Res<SelectedGizmo>,
-    gizmo_data: Query<&GizmoAxis>,
+    selected: Res<NewGizmoConfig>,
+    gizmo_data: Query<(&GizmoAxis, Option<&GizmoConfig>)>,
     mut accrued: Local<Vec2>,
 ) {
     // return if not dragging with primary button
     if event.button != PointerButton::Primary {
         return;
     }
-    let gizmo_distance_scale = selected.speed_scale;
-    let free_rotate_speed = 0.3 * gizmo_distance_scale;
-
-    let Ok(gizmo_axis) = gizmo_data.get(event.target) else {
+    let Ok((gizmo_axis, config)) = gizmo_data.get(event.target) else {
         log!(
             LogType::Editor,
             LogLevel::Warning,
@@ -275,6 +273,23 @@ pub fn handle_rotate_dragging(
         );
         return;
     };
+    let GizmoConfig::Rotate {
+        speed_scale,
+        distance_scale,
+        mode,
+    } = config.cloned().unwrap_or(selected.rotation())
+    else {
+        log!(
+            LogType::Editor,
+            LogLevel::Warning,
+            LogCategory::Input,
+            "Gizmo Config for rotation was not a Rotation Config",
+        );
+        return;
+    };
+
+    let free_rotate_speed = 0.3 * speed_scale;
+
     *accrued += event.delta * free_rotate_speed;
     if accrued.x.abs() < gizmo_snap.rotate_value && accrued.y.abs() < gizmo_snap.rotate_value {
         return;

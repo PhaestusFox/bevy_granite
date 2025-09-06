@@ -9,6 +9,7 @@ bevy_egui = { workspace = true }
 bevy_obj = { workspace = true }
 native-dialog = { workspace = true }
 uuid = { workspace = true }
+bevy-inspector-egui = { workspace = true }
 
 bevy_granite_logging = { path = "../bevy_granite_logging"}
 bevy_granite_core = { path = "../bevy_granite_core"}

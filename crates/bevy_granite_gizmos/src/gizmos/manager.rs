@@ -1,9 +1,9 @@
 use super::{
     despawn_rotate_gizmo, despawn_transform_gizmo, spawn_rotate_gizmo, spawn_transform_gizmo,
-    DespawnGizmoEvent, GizmoType, LastSelectedGizmo, RotateGizmo, RotateGizmoParent, SelectedGizmo,
-    SpawnGizmoEvent, TransformGizmo, TransformGizmoParent,
+    DespawnGizmoEvent, GizmoType, LastSelectedGizmo, NewGizmoConfig, RotateGizmo,
+    RotateGizmoParent, SpawnGizmoEvent, TransformGizmo, TransformGizmoParent,
 };
-use crate::selection::ActiveSelection;
+use crate::{gizmos::NewGizmoType, selection::ActiveSelection};
 use bevy::prelude::{
     Assets, Children, Commands, Entity, EventReader, EventWriter, GlobalTransform, Mesh, Query,
     Res, ResMut, StandardMaterial, With, Without,
@@ -19,28 +19,31 @@ pub fn gizmo_events(
     mut materials: ResMut<Assets<StandardMaterial>>,
     mut transform_query: Query<&GlobalTransform, Without<TransformGizmoParent>>,
     mut rotate_query: Query<&GlobalTransform, Without<RotateGizmoParent>>,
-    selected_gizmo: Res<SelectedGizmo>,
+    selected_gizmo: Res<NewGizmoType>,
     mut spawn_events: EventReader<SpawnGizmoEvent>,
     mut despawn_events: EventReader<DespawnGizmoEvent>,
     mut transform_gizmo_query: Query<(Entity, &TransformGizmo, &Children)>,
     mut rotate_gizmo_query: Query<(Entity, &RotateGizmo, &Children)>,
+    new_config: Res<NewGizmoConfig>,
 ) {
     for SpawnGizmoEvent(entity) in spawn_events.read() {
-        if matches!(selected_gizmo.value, GizmoType::Transform) {
+        if matches!(**selected_gizmo, GizmoType::Transform) {
             spawn_transform_gizmo(
                 *entity,
                 &mut transform_query,
                 &mut commands,
                 &mut meshes,
                 &mut materials,
+                new_config.transform(),
             );
-        } else if matches!(selected_gizmo.value, GizmoType::Rotate) {
+        } else if matches!(**selected_gizmo, GizmoType::Rotate) {
             spawn_rotate_gizmo(
                 *entity,
                 &mut rotate_query,
                 &mut commands,
                 &mut materials,
                 &mut meshes,
+                new_config.rotation(),
             );
         }
     }
@@ -55,13 +58,13 @@ pub fn gizmo_events(
 }
 
 pub fn gizmo_changed_watcher(
-    selected_gizmo: Res<SelectedGizmo>,
+    selected_gizmo: Res<NewGizmoType>,
     mut last_selected_gizmo: ResMut<LastSelectedGizmo>,
     mut despawn_writer: EventWriter<DespawnGizmoEvent>,
     mut spawn_writer: EventWriter<SpawnGizmoEvent>,
     active_selection: Query<Entity, With<ActiveSelection>>,
 ) {
-    if selected_gizmo.value != last_selected_gizmo.value {
+    if **selected_gizmo != last_selected_gizmo.value {
         log!(
             LogType::Editor,
             LogLevel::OK,
@@ -69,7 +72,7 @@ pub fn gizmo_changed_watcher(
             "Gizmo changed"
         );
         despawn_writer.write(DespawnGizmoEvent(last_selected_gizmo.value));
-        last_selected_gizmo.value = selected_gizmo.value;
+        last_selected_gizmo.value = **selected_gizmo;
 
         if let Ok(active) = active_selection.single() {
             spawn_writer.write(SpawnGizmoEvent(active));

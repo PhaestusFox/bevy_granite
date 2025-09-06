@@ -14,6 +14,7 @@ use crate::{
 };
 use bevy::{
     ecs::{observer::Trigger, query::Changed, system::Local},
+    math::primitives::InfinitePlane3d,
     picking::{
         events::{Drag, Pointer, Pressed},
         hover::PickingInteraction,
@@ -23,6 +24,7 @@ use bevy::{
         ChildOf, Children, Entity, EventReader, EventWriter, GlobalTransform, Mut, Name, ParamSet,
         Quat, Query, Res, ResMut, Transform, Vec2, Vec3, Visibility, With, Without,
     },
+    render::camera::Camera,
 };
 use bevy_granite_core::{CursorWindowPos, IconProxy, UserInput};
 use bevy_granite_logging::{
@@ -249,7 +251,7 @@ fn hide_unselected_axes(
 pub fn handle_rotate_dragging(
     event: Trigger<Pointer<Drag>>,
     targets: Query<&GizmoOf>,
-    camera_query: Query<&Transform, With<GizmoCamera>>,
+    camera_query: Query<(&GlobalTransform, &Camera), With<GizmoCamera>>,
     mut objects: Query<&mut Transform, Without<GizmoCamera>>,
     gizmo_snap: Res<GizmoSnap>,
     selected: Res<SelectedGizmo>,
@@ -279,14 +281,8 @@ pub fn handle_rotate_dragging(
     }
     let x_step = snap_roation(accrued.x, gizmo_snap.rotate_value);
     let y_step = snap_roation(accrued.y, gizmo_snap.rotate_value);
-    *accrued = Vec2::ZERO;
     let delta_x = x_step.to_radians();
     let delta_y = y_step.to_radians();
-    let delta_z = if x_step.abs() > y_step.abs() {
-        delta_x
-    } else {
-        delta_y
-    };
     let Ok(target) = targets.get(event.target) else {
         log(
             LogType::Editor,
@@ -296,7 +292,7 @@ pub fn handle_rotate_dragging(
         );
         return;
     };
-    let Ok(camera) = camera_query.single() else {
+    let Ok((camera_transform, camera)) = camera_query.single() else {
         log!(
             LogType::Editor,
             LogLevel::Error,
@@ -305,43 +301,95 @@ pub fn handle_rotate_dragging(
         );
         return;
     };
-    let rotation_delta = Quat::from_axis_angle(camera.up().as_vec3(), delta_x)
-        * Quat::from_axis_angle(camera.right().as_vec3(), delta_y);
+    let rotation_delta = Quat::from_axis_angle(camera_transform.up().as_vec3(), delta_x)
+        * Quat::from_axis_angle(camera_transform.right().as_vec3(), delta_y);
+    let Ok(click_ray) = camera.viewport_to_world(camera_transform, event.pointer_location.position)
+    else {
+        log! {
+            LogType::Editor,
+            LogLevel::Error,
+            LogCategory::Input,
+            "Failed to convert viewport to world coordinates for pointer location: {:?}",
+            event.pointer_location.position
+        };
+        return;
+    };
+    let (pitch, roll, yaw) = rotation_delta.to_euler(bevy::math::EulerRot::XZY);
+    let Ok(mut transform) = objects.get_mut(**target) else {
+        log!(
+            LogType::Editor,
+            LogLevel::Error,
+            LogCategory::Debug,
+            "Target entity {:?} missing Transform for rotation drag",
+            **target
+        );
+        return;
+    };
     match gizmo_axis {
         GizmoAxis::All => {
-            if let Ok(mut transform) = objects.get_mut(**target) {
-                transform.rotate(rotation_delta);
-            }
+            transform.rotate(rotation_delta);
         }
         GizmoAxis::X => {
-            if let Ok(mut transform) = objects.get_mut(**target) {
-                // transform.rotate(Quat::from_axis_angle(Vec3::X, delta_z));
-                let (pitch, _, _) = rotation_delta.to_euler(bevy::math::EulerRot::XZY);
-                transform.rotate_x(pitch);
+            let mut delta = pitch;
+            if let Some(hit_distance) = click_ray.intersect_plane(
+                Vec3::new(transform.translation.x, 0., 0.),
+                InfinitePlane3d::new(Vec3::X),
+            ) {
+                let hit_point = camera_transform.translation() + click_ray.direction * hit_distance;
+                let z_diff = transform.translation.z - hit_point.z;
+                let y_diff = transform.translation.y - hit_point.y;
+                delta += roll * z_diff.signum();
+                delta += yaw * y_diff.signum();
             }
+            if transform.translation.x > camera_transform.translation().x {
+                delta = -delta;
+            }
+            transform.rotate_x(delta);
         }
         GizmoAxis::Y => {
-            if let Ok(mut transform) = objects.get_mut(**target) {
-                let (_, _, yaw) = rotation_delta.to_euler(bevy::math::EulerRot::XZY);
-                transform.rotate_y(yaw);
+            let mut delta = yaw;
+            if let Some(hit_distance) = click_ray.intersect_plane(
+                Vec3::new(0., transform.translation.y, 0.),
+                InfinitePlane3d::new(Vec3::Y),
+            ) {
+                let hit_point = camera_transform.translation() + click_ray.direction * hit_distance;
+                let z_diff = transform.translation.z - hit_point.z;
+                let x_diff = transform.translation.x - hit_point.x;
+                delta += pitch * x_diff.signum();
+                delta += roll * z_diff.signum();
             }
+            if transform.translation.y > camera_transform.translation().y {
+                delta = -delta;
+            }
+            transform.rotate_y(delta);
         }
         GizmoAxis::Z => {
-            if let Ok(mut transform) = objects.get_mut(**target) {
-                let (_, roll, _) = rotation_delta.to_euler(bevy::math::EulerRot::XZY);
-                transform.rotate_z(roll);
+            let mut delta = roll;
+            if let Some(hit_distance) = click_ray.intersect_plane(
+                Vec3::new(0., 0., transform.translation.z),
+                InfinitePlane3d::new(Vec3::Z),
+            ) {
+                let hit_point = camera_transform.translation() + click_ray.direction * hit_distance;
+                let y_diff = transform.translation.y - hit_point.y;
+                let x_diff = transform.translation.x - hit_point.x;
+                delta += yaw * y_diff.signum();
+                delta += pitch * x_diff.signum();
             }
+            if transform.translation.z > camera_transform.translation().z {
+                delta = -delta;
+            }
+            transform.rotate_z(delta);
         }
-        _ => {
+        GizmoAxis::None => {
             log!(
                 LogType::Editor,
-                LogLevel::Critical,
+                LogLevel::Error,
                 LogCategory::Debug,
-                "Rotation Gizmo Axis not implemented for axis {:?}",
-                gizmo_axis
+                "Rotation Gizmo Axis None Should not happen",
             )
         }
     }
+    *accrued = Vec2::ZERO;
 }
 
 fn snap_roation(value: f32, inc: f32) -> f32 {

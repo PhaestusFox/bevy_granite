@@ -34,13 +34,7 @@ pub fn drag_transform_gizmo(
     gizmo_data: Query<(&GizmoAxis, &TransformGizmo)>,
     user_input: Res<UserInput>,
 ) {
-    // Middle mouse button while dragging on axis can get is in a weird state
-    // not sure why... but this fixes it
-    // Technically any two button clicks on the gizmo gets it in an invalid state since two sets of Drag events are sent and are in different axis
-    // Right mouse is just not as obvious because the camera is moving and breaks the raycast
-    // Ps. Is there any reason we are using UserInput instead of bevy's input system?
-    // feels like redundant work to maintain and prone to missmatch logic
-    // It also makes the editor less versatile since things like picking have a abstracted concept of "Primary" and "Secondary" button so it works independently of user control surface. eg touch, pen, mouse
+    // Only drag with Primary Input drags
     if event.button != bevy::picking::pointer::PointerButton::Primary {
         return;
     }
@@ -115,7 +109,7 @@ pub fn drag_transform_gizmo(
             ) else {
                 return;
             };
-            let hit = camera_transform.translation() - (click_ray.direction * -click_distance);
+            let hit = camera_transform.translation() + (click_ray.direction * click_distance);
             let delta_x = snap_gizmo(hit.x, gizmo_snap.transform_value) - current_world_pos.x;
 
             if let Ok(parent) = parents.get(*target) {

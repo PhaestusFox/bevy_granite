@@ -26,7 +26,6 @@ pub fn editor_gizmos_ui(
             contexts.ctx_mut().expect("there to alway be a contex"),
             |ui| {
                 let mut active = selected_option.as_mut().0;
-                println!("active: {:?}", active);
                 let mut mode = config.mode;
                 let mut local = None;
                 let mut changed = false;

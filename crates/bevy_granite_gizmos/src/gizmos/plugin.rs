@@ -57,8 +57,7 @@ impl Plugin for GizmoPlugin {
                     // Rotate gizmo
                     handle_rotate_input,
                     handle_init_rotate_drag.after(handle_rotate_input),
-                    handle_rotate_dragging.after(handle_init_rotate_drag),
-                    handle_rotate_reset.after(handle_rotate_dragging),
+                    handle_rotate_reset.after(handle_rotate_input),
                 )
                     .run_if(is_gizmos_active),
             )

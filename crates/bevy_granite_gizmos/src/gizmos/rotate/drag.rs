@@ -17,6 +17,7 @@ use bevy::{
     picking::{
         events::{Drag, Pointer, Pressed},
         hover::PickingInteraction,
+        pointer::PointerButton,
     },
     prelude::{
         ChildOf, Children, Entity, EventReader, EventWriter, GlobalTransform, Mut, Name, ParamSet,
@@ -255,6 +256,10 @@ pub fn handle_rotate_dragging(
     gizmo_data: Query<&GizmoAxis>,
     mut accrued: Local<Vec2>,
 ) {
+    // return if not dragging with primary button
+    if event.button != PointerButton::Primary {
+        return;
+    }
     let gizmo_distance_scale = selected.speed_scale;
     let free_rotate_speed = 0.3 * gizmo_distance_scale;
 

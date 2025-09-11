@@ -196,6 +196,7 @@ format_version: {};
 
 enum SceneFormat {
     HumanVerbose,
+    HumanReduced,
     HumanCompact,
     Binary,
 }
@@ -205,6 +206,7 @@ impl SceneFormat {
         match self {
             SceneFormat::HumanVerbose => "GHS",
             SceneFormat::HumanCompact => "GHS",
+            SceneFormat::HumanReduced => "GHS",
             SceneFormat::Binary => "GBS",
         }
     }

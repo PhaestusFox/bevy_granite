@@ -2,7 +2,7 @@
 // Children inherit rotation automatically through hierarchy
 use crate::{
     gizmos::{
-        NewGizmoType, GizmoConfig, GizmoMesh, GizmoOf, GizmoSnap, GizmoType, NewGizmoConfig,
+        GizmoConfig, GizmoMesh, GizmoOf, GizmoSnap, GizmoType, NewGizmoConfig, NewGizmoType,
         RotateDraggingEvent, RotateGizmo, RotateGizmoParent, RotateInitDragEvent,
         RotateResetDragEvent,
     },

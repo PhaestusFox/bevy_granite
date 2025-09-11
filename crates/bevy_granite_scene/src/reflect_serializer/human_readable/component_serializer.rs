@@ -4,6 +4,7 @@ use bevy::reflect::{Reflect, TypeRegistry};
 use bevy_granite_core::EditorIgnore;
 
 use crate::reflect_serializer::ComponentSerializeError;
+use crate::scene::{SceneFormat, SceneFormatDyn};
 use crate::{MetaData, pwrite};
 
 pub struct ComponentSerializer<'a, W> {
@@ -11,6 +12,7 @@ pub struct ComponentSerializer<'a, W> {
     stream: &'a mut W,
     indent: usize,
     metadata: &'a MetaData,
+    data: &'a mut dyn SceneFormatDyn<W>,
 }
 
 impl<'a, W> ComponentSerializer<'a, W> {
@@ -19,12 +21,14 @@ impl<'a, W> ComponentSerializer<'a, W> {
         stream: &'a mut W,
         indent: usize,
         metadata: &'a MetaData,
+        data: &'a mut dyn SceneFormatDyn<W>,
     ) -> Self {
         Self {
             type_registry,
             stream,
             indent,
             metadata,
+            data,
         }
     }
 }
@@ -53,7 +57,10 @@ impl<'a, W: std::fmt::Write> ComponentSerializer<'a, W> {
             return Err(ComponentSerializeError::NoComponentData.into());
         };
         // print the component type name
-        pwrite!(self.stream, "{}: ":self.indent, component_data.reflect_type_path())?;
+        let name = self
+            .data
+            .get_component_display_name(component_data.reflect_type_info().type_path());
+        pwrite!(self.stream, "{}: ":self.indent, name)?;
 
         let mut serializer = super::ReflectSerializer::new(
             self.type_registry,

@@ -1,46 +1,4 @@
-use bevy::{
-    asset::uuid,
-    ecs::{
-        component::{ComponentId, Components},
-        entity::{Entity, EntityHashMap, EntityHashSet},
-        reflect::AppTypeRegistry,
-        world::World,
-    },
-    reflect::TypeRegistry,
-};
-use bevy_granite_core::{EditorIgnore, entities::serialize::SceneMetadata};
-
-use crate::{MetaData, Result};
-
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
-pub struct SceneData {
-    pub metadata: SceneMetadata,
-    pub entities: Vec<SaveReadyEntity>,
-    pub resources: Vec<ResourceSaveReadyData>,
-}
-
-impl SceneData {
-    pub fn new(entity_count: usize) -> Self {
-        Self {
-            metadata: SceneMetadata {
-                format_version: bevy_granite_core::get_beta_scene_version(),
-                entity_count,
-            },
-            entities: Vec::with_capacity(entity_count),
-            resources: Vec::new(),
-        }
-    }
-}
-
-pub struct EntityMetaData {
-    pub id: uuid::Uuid,
-}
-
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
-pub struct SaveReadyEntity {}
-
-#[derive(serde::Serialize, serde::Deserialize, Debug)]
-pub struct ResourceSaveReadyData {}
+use super::*;
 
 pub struct SceneSaver<'a, W> {
     entity_map: MetaData,
@@ -48,10 +6,11 @@ pub struct SceneSaver<'a, W> {
     components: &'a Components,
     world: &'a World,
     indent: usize,
-    format: SceneFormat,
+    data: Box<dyn SceneFormatDyn<W>>,
     file: W,
 }
 
+#[derive(DerefMut, Deref)]
 pub struct IoWapper<W: std::io::Write> {
     inner: W,
 }
@@ -72,8 +31,13 @@ impl<W: std::io::Write> core::fmt::Write for IoWapper<W> {
     }
 }
 
-impl<'a> SceneSaver<'a, IoWapper<std::io::BufWriter<std::fs::File>>> {
-    pub fn new(world: &'a World, file: impl AsRef<str>) -> std::io::Result<Self> {
+type FileWriter = IoWapper<std::io::BufWriter<std::fs::File>>;
+
+impl<'a> SceneSaver<'a, FileWriter> {
+    pub fn new<F: 'static + SceneFormatDyn<FileWriter> + Default>(
+        world: &'a World,
+        file: impl AsRef<str>,
+    ) -> std::io::Result<Self> {
         let abs = bevy_granite_core::shared::rel_asset_to_absolute(file.as_ref());
         println!("Saving scene to absolute path: {abs}");
         let file = std::fs::File::create(abs.as_ref())?;
@@ -85,12 +49,11 @@ impl<'a> SceneSaver<'a, IoWapper<std::io::BufWriter<std::fs::File>>> {
             register: world.resource::<AppTypeRegistry>().clone(),
             components: world.components(),
             world,
-            format: SceneFormat::HumanVerbose,
+            data: Box::new(F::default()),
             indent: 0,
         })
     }
 }
-
 impl<'a, W> SceneSaver<'a, W> {
     #[inline]
     pub fn reserve_entity(&mut self, entity: Entity) {
@@ -146,10 +109,15 @@ impl<'a, W: std::fmt::Write> SceneSaver<'a, W> {
         }
         //add metadata to .garnet
         self.add_metadata()?;
-
+        self.data.add_head(&mut self.file)?;
         if self.entity_count() > 0 {
             self.serialize_entities()?;
         }
+        if self.resource_count() > 0 {
+            self.serialize_resources()?;
+        }
+
+        self.data.add_tail(&mut self.file)?;
         Ok(())
     }
 
@@ -160,18 +128,18 @@ impl<'a, W: std::fmt::Write> SceneSaver<'a, W> {
 [metadata]
 format_version: {};
 "#,
-            self.format.magic(),
+            String::from_utf8_lossy(&self.data.magic()),
             bevy_granite_core::get_beta_scene_version()
         )?;
 
         let count = self.entity_count();
         if count > 0 {
-            writeln!(&mut self.file, "entity_count: {count}")?;
+            writeln!(&mut self.file, "entity_count: {count};")?;
         }
 
         let count = self.resource_count();
         if count > 0 {
-            writeln!(&mut self.file, "resource_count: {count}")?;
+            writeln!(&mut self.file, "resource_count: {count};")?;
         }
 
         Ok(())
@@ -180,48 +148,23 @@ format_version: {};
     fn serialize_entities(&mut self) -> Result<()> {
         writeln!(&mut self.file, "[entities]")?;
         let register = self.register.read();
-        let mut entitiy_serializer = crate::reflect_serializer::EntitySerializer::new(
-            &register,
-            self.components,
-            &mut self.file,
-            self.indent + 1,
-            &self.entity_map,
-        );
+        let mut entitiy_serializer: crate::reflect_serializer::EntitySerializer<'_, W> =
+            crate::reflect_serializer::EntitySerializer::new(
+                &register,
+                self.components,
+                &mut self.file,
+                self.indent + 1,
+                &self.entity_map,
+                self.data.as_mut(),
+            );
         for entity in self.entity_map.keys() {
             entitiy_serializer.serialize_entity(*entity, self.world)?;
         }
         Ok(())
     }
-}
 
-enum SceneFormat {
-    HumanVerbose,
-    HumanReduced,
-    HumanCompact,
-    Binary,
-}
-
-impl SceneFormat {
-    fn magic(&self) -> &str {
-        match self {
-            SceneFormat::HumanVerbose => "GHS",
-            SceneFormat::HumanCompact => "GHS",
-            SceneFormat::HumanReduced => "GHS",
-            SceneFormat::Binary => "GBS",
-        }
+    fn serialize_resources(&mut self) -> Result<()> {
+        writeln!(&mut self.file, "[resources]")?;
+        Ok(())
     }
-}
-
-#[derive(thiserror::Error, Debug)]
-pub enum SceneFormatError {
-    #[error("Unknown format: {0}")]
-    UnknownFormat(String),
-    #[error("Format write error: {0}")]
-    FmtWriteError(#[from] std::fmt::Error),
-    #[error(
-        "Entity {0:?} has no metadata, this means it doesn't have a associated UUID, this might be automatic in future but for now all entities must be reserved before serializing"
-    )]
-    EntityNotReserved(Entity),
-    #[error("component serialization error: {0}")]
-    ComponentSerializeError(#[from] crate::reflect_serializer::ComponentSerializeError),
 }

@@ -13,6 +13,7 @@ use serde::Serialize;
 use crate::{
     MetaData, Result, pwrite, pwriteln,
     reflect_serializer::{ComponentSerializeError, human_readable::ComponentSerializer},
+    scene::{SceneFormat, SceneFormatDyn},
 };
 use crate::{reflect_serializer::pure_reflect::serialize_with_reflect, scene::EntityMetaData};
 
@@ -37,8 +38,13 @@ impl<'a, W: std::fmt::Write> EntitySerializer<'a, W> {
             return Ok(());
         }
         pwriteln!(self.stream, "[Components]":self.indent)?;
-        let mut component_serializer =
-            ComponentSerializer::new(self.type_registry, self.stream, self.indent, self.metadata);
+        let mut component_serializer = ComponentSerializer::new(
+            self.type_registry,
+            self.stream,
+            self.indent,
+            self.metadata,
+            self.data,
+        );
 
         // iterate over all components in the entity
         for component_id in entity_data.archetype().components() {
@@ -116,7 +122,7 @@ impl<'a, W: std::fmt::Write> EntitySerializer<'a, W> {
             }
         }
 
-        //todo serialize the entity
+        drop(component_serializer);
 
         writeln!(self.stream, ")")?;
         Ok(())
@@ -210,6 +216,7 @@ pub struct EntitySerializer<'a, W> {
     stream: &'a mut W,
     indent: usize,
     metadata: &'a MetaData,
+    data: &'a mut dyn SceneFormatDyn<W>,
 }
 
 impl<'a, W: Write> EntitySerializer<'a, W> {
@@ -219,6 +226,7 @@ impl<'a, W: Write> EntitySerializer<'a, W> {
         stream: &'a mut W,
         indent: usize,
         metadata: &'a MetaData,
+        data: &'a mut dyn SceneFormatDyn<W>,
     ) -> Self {
         Self {
             type_registry,
@@ -226,6 +234,7 @@ impl<'a, W: Write> EntitySerializer<'a, W> {
             stream,
             indent,
             metadata,
+            data,
         }
     }
 }

@@ -8,7 +8,11 @@ use bevy::{
 use bevy_granite_core::{EditorIgnore, entities};
 use rand::SeedableRng;
 
-use crate::{MetaData, reflect_serializer::test::data_generation::EntitiesForTest};
+use crate::{
+    MetaData,
+    reflect_serializer::test::data_generation::EntitiesForTest,
+    scene::{HumanReduced, HumanVerbose},
+};
 
 mod data_generation;
 
@@ -27,7 +31,9 @@ fn enums() {
     let reg = world.resource::<AppTypeRegistry>().clone();
     let reg = reg.read();
     let meta = MetaData::default();
-    let mut entity_serde = super::EntitySerializer::new(&reg, components, &mut out, 0, &meta);
+    let mut data = HumanVerbose;
+    let mut entity_serde =
+        super::EntitySerializer::new(&reg, components, &mut out, 0, &meta, &mut data);
     for (entity, _) in entities.entitys.iter() {
         entity_serde.serialize_entity(*entity, &world);
     }
@@ -35,7 +41,7 @@ fn enums() {
 }
 
 #[test]
-fn world_saver() {
+fn world_saver_verbose() {
     let mut app = App::new();
     app.insert_resource(Seed(42));
     app.init_resource::<EntitiesForTest>();
@@ -45,10 +51,32 @@ fn world_saver() {
 
     app.update();
     let world = app.world();
-    let serialiser = crate::scene::SceneSaver::new(
+    let serialiser = crate::scene::SceneSaver::new::<HumanVerbose>(
         world,
         format!(
-            "{}/../../assets/scenes/test_scene.garnet",
+            "{}/../../assets/scenes/verbose_scene.garnet",
+            std::env::current_dir().unwrap().display()
+        ),
+    )
+    .expect("can create scene saver");
+    serialiser.serialize_world().expect("can serialize world");
+}
+
+#[test]
+fn world_saver_reduced() {
+    let mut app = App::new();
+    app.insert_resource(Seed(42));
+    app.init_resource::<EntitiesForTest>();
+    app.add_systems(Startup, data_generation::spawn_entitys);
+    init_type_registry(&mut app);
+    crate::reflect_serializer::register_garnet_serialize_types(&mut app);
+
+    app.update();
+    let world = app.world();
+    let serialiser = crate::scene::SceneSaver::new::<HumanReduced>(
+        world,
+        format!(
+            "{}/../../assets/scenes/reduced_scene.garnet",
             std::env::current_dir().unwrap().display()
         ),
     )

@@ -318,12 +318,14 @@ impl<'a, W: std::fmt::Write> ReflectSerializer<'a, W> {
             return Ok(());
         }
         writeln!(self.stream, "(")?;
+        self.indent += 1;
         for i in 0..tuple_ref.field_len() {
             if i > 0 {
                 writeln!(self.stream, ",")?;
             }
             self.serialize(tuple_ref.field(i).expect("field index out of bounds"))?;
         }
+        self.indent -= 1;
         self.stream.write_char('\n')?;
         pwrite!(self.stream, ")":self.indent)?;
         Ok(())

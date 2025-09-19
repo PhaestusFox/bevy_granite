@@ -1,13 +1,14 @@
 use super::ui::expand_to_entity;
+use crate::editor_state::EditorState;
 use crate::interface::events::RequestRemoveParentsFromEntities;
 use crate::interface::{SideDockState, SideTab};
 use bevy::ecs::query::Has;
 use bevy::ecs::system::Commands;
 use bevy::{
     ecs::query::{Changed, Or},
-    prelude::{ChildOf, Entity, Event, EventWriter, Name, Query, ResMut, With},
+    prelude::{ChildOf, Entity, Event, EventWriter, Name, Query, Res, ResMut, With},
 };
-use bevy_granite_core::{GraniteType, IdentityData, TreeHiddenEntity};
+use bevy_granite_core::{GraniteType, IdentityData, SaveSettings, SpawnSource, TreeHiddenEntity};
 use bevy_granite_gizmos::selection::events::EntityEvent;
 use bevy_granite_gizmos::{ActiveSelection, GizmoChildren, GizmoMesh, Selected};
 use bevy_granite_logging::{log, LogCategory, LogLevel, LogType};
@@ -34,6 +35,7 @@ pub struct NodeTreeTabData {
     pub search_filter: String,
     pub drag_payload: Option<Vec<Entity>>, // Entities being dragged
     pub drop_target: Option<Entity>,       // Entity being dropped onto
+    pub active_scene_file: Option<String>, // Currently active scene file path
 }
 
 impl Default for NodeTreeTabData {
@@ -53,6 +55,7 @@ impl Default for NodeTreeTabData {
             search_filter: String::new(),
             drag_payload: None,
             drop_target: None,
+            active_scene_file: None,
         }
     }
 }
@@ -63,24 +66,29 @@ pub struct HierarchyEntry {
     pub entity_type: String,
     pub parent: Option<Entity>,
     pub is_expanded: bool,
+    pub is_dummy_parent: bool, // True if this is a file-based grouping dummy parent
+    pub is_preserve_disk: bool, // True if entity has SaveSettings::PreserveDiskFull
+    pub is_preserve_disk_transform: bool, // True if entity has SaveSettings::PreserveDiskTransform
 }
 
 pub fn update_node_tree_tabs_system(
     mut right_dock: ResMut<SideDockState>,
     active_selection: Query<Entity, With<ActiveSelection>>,
     all_selected: Query<Entity, With<Selected>>,
+    editor_state: Res<EditorState>,
     mut hierarchy_query: Query<(
         Entity,
         &Name,
         Option<&ChildOf>,
         Option<&IdentityData>,
+        Option<&SpawnSource>,
         (Has<GizmoChildren>, Has<GizmoMesh>, Has<TreeHiddenEntity>),
     )>,
 
     // detect changes (excluding Parent since we check that manually)
     mut changed_hierarchy: Query<
         (Has<GizmoChildren>, Has<GizmoMesh>, Has<TreeHiddenEntity>),
-        Or<(Changed<Name>, Changed<IdentityData>)>,
+        Or<(Changed<Name>, Changed<IdentityData>, Changed<SpawnSource>)>,
     >,
     mut commands: Commands,
     mut reparent_event_writer: EventWriter<RequestReparentEntityEvent>,
@@ -91,18 +99,21 @@ pub fn update_node_tree_tabs_system(
             let previous_selection = data.active_selection;
             data.active_selection = active_selection.single().ok();
             data.selected_entities = all_selected.iter().collect();
+            data.active_scene_file = editor_state.current_file.clone();
 
             let (entities_changed, data_changed, hierarchy_changed) = if data.filtered_hierarchy {
                 let q = hierarchy_query
                     .iter()
-                    .filter(|(_, _, _, _, a)| !(a.0 || a.1 || a.2))
-                    .map(|(a, b, c, d, _)| (a, b, c, d));
+                    .filter(|(_, _, _, _, _, a)| !(a.0 || a.1 || a.2))
+                    .map(|(a, b, c, d, e, _)| (a, b, c, d, e));
                 let c = changed_hierarchy
                     .iter()
                     .any(|filter| !(filter.0 || filter.1 || filter.2));
                 detect_changes(q, c, data)
             } else {
-                let q = hierarchy_query.iter().map(|(a, b, c, d, _)| (a, b, c, d));
+                let q = hierarchy_query
+                    .iter()
+                    .map(|(a, b, c, d, e, _)| (a, b, c, d, e));
                 let c = !changed_hierarchy.is_empty();
                 detect_changes(q, c, data)
             };
@@ -111,11 +122,13 @@ pub fn update_node_tree_tabs_system(
                 if data.filtered_hierarchy {
                     let q = hierarchy_query
                         .iter()
-                        .filter(|(_, _, _, _, a)| !(a.0 || a.1 || a.2))
-                        .map(|(a, b, c, d, _)| (a, b, c, d));
+                        .filter(|(_, _, _, _, _, a)| !(a.0 || a.1 || a.2))
+                        .map(|(a, b, c, d, e, _)| (a, b, c, d, e));
                     update_hierarchy_data(data, q, hierarchy_changed);
                 } else {
-                    let q = hierarchy_query.iter().map(|(a, b, c, d, _)| (a, b, c, d));
+                    let q = hierarchy_query
+                        .iter()
+                        .map(|(a, b, c, d, e, _)| (a, b, c, d, e));
                     update_hierarchy_data(data, q, hierarchy_changed);
                 }
             }
@@ -322,6 +335,7 @@ fn detect_changes<'a>(
                 &'a Name,
                 Option<&'a ChildOf>,
                 Option<&'a IdentityData>,
+                Option<&'a SpawnSource>,
             ),
         > + Clone,
     changed_hierarchy: bool,
@@ -329,7 +343,8 @@ fn detect_changes<'a>(
 ) -> (bool, bool, bool) {
     use std::collections::HashSet;
 
-    let current_entities: HashSet<Entity> = hierarchy_query.clone().map(|(e, _, _, _)| e).collect();
+    let current_entities: HashSet<Entity> =
+        hierarchy_query.clone().map(|(e, _, _, _, _)| e).collect();
     let existing_entities: HashSet<Entity> =
         data.hierarchy.iter().map(|entry| entry.entity).collect();
 
@@ -339,14 +354,16 @@ fn detect_changes<'a>(
 
     // Also check if any parent relationships changed by comparing current vs stored hierarchy
     let hierarchy_changed = if !entities_changed {
-        hierarchy_query.into_iter().any(|(entity, _, relation, _)| {
-            if let Some(entry) = data.hierarchy.iter().find(|e| e.entity == entity) {
-                let current_parent = relation.map(|p| p.parent());
-                entry.parent != current_parent
-            } else {
-                true // Entity not found in stored hierarchy
-            }
-        })
+        hierarchy_query
+            .into_iter()
+            .any(|(entity, _, relation, _, _)| {
+                if let Some(entry) = data.hierarchy.iter().find(|e| e.entity == entity) {
+                    let current_parent = relation.map(|p| p.parent());
+                    entry.parent != current_parent
+                } else {
+                    true // Entity not found in stored hierarchy
+                }
+            })
     } else {
         false // entities_changed already covers this case
     };
@@ -412,6 +429,7 @@ fn update_hierarchy_data<'a>(
             &'a Name,
             Option<&'a ChildOf>,
             Option<&'a IdentityData>,
+            Option<&'a SpawnSource>,
         ),
     >,
     hierarchy_changed: bool,
@@ -426,15 +444,26 @@ fn update_hierarchy_data<'a>(
             "Hierarchy relationships changed - refreshing node tree"
         );
     }
+
     let existing_expanded: HashMap<Entity, bool> = data
         .hierarchy
         .iter()
         .map(|entry| (entry.entity, entry.is_expanded))
         .collect();
 
-    let mut hierarchy_entries: Vec<HierarchyEntry> = hierarchy_query
-        .into_iter()
-        .map(|(entity, name, relation, identity)| HierarchyEntry {
+    // First, collect all entities and group those with ANY SpawnSource
+    let mut real_entities: Vec<HierarchyEntry> = Vec::new();
+    let mut file_groups: HashMap<String, Vec<Entity>> = HashMap::new();
+
+    for (entity, name, relation, identity, spawn_source) in hierarchy_query {
+        let is_preserve_disk = spawn_source.map_or(false, |source| {
+            matches!(source.save_settings_ref(), SaveSettings::PreserveDiskFull)
+        });
+        let is_preserve_disk_transform = spawn_source.map_or(false, |source| {
+            matches!(source.save_settings_ref(), SaveSettings::PreserveDiskTransform)
+        });
+
+        let entry = HierarchyEntry {
             entity,
             name: name.to_string(),
             entity_type: identity
@@ -442,9 +471,85 @@ fn update_hierarchy_data<'a>(
                 .unwrap_or_else(|| "Unknown".to_string()),
             parent: relation.map(|r| r.parent()),
             is_expanded: existing_expanded.get(&entity).copied().unwrap_or(false),
-        })
-        .collect();
+            is_dummy_parent: false,
+            is_preserve_disk,
+            is_preserve_disk_transform,
+        };
 
-    hierarchy_entries.sort_by_key(|entry| entry.entity.index());
+        // Group ALL entities that have SpawnSource (regardless of SaveSettings mode)
+        if let Some(spawn_source) = spawn_source {
+            let file_path = spawn_source.str_ref().to_string();
+
+            file_groups.entry(file_path).or_default().push(entity);
+        }
+
+        real_entities.push(entry);
+    }
+
+    // Create dummy parents for file groups and update entity parents
+    let mut hierarchy_entries: Vec<HierarchyEntry> = Vec::new();
+    let mut dummy_parent_entities: HashMap<String, Entity> = HashMap::new();
+
+    // Create dummy parent entities for each file group
+    for (file_path, entities) in &file_groups {
+        if entities.len() > 0 {
+            // Only create dummy parent if there are entities
+            // Create a stable dummy entity ID based on file path hash
+            // Use a simple but stable hash of the file path
+            let mut hash: u32 = 5381;
+            for byte in file_path.bytes() {
+                hash = hash.wrapping_mul(33).wrapping_add(byte as u32);
+            }
+            // Ensure we use the high range to avoid conflicts with real entities
+            let dummy_entity = Entity::from_raw(u32::MAX - (hash % 1000000));
+
+            dummy_parent_entities.insert(file_path.clone(), dummy_entity);
+
+            // Create dummy parent entry
+            let dummy_entry = HierarchyEntry {
+                entity: dummy_entity,
+                name: file_path.clone(),
+                entity_type: "Scene".to_string(),
+                parent: None,
+                is_expanded: existing_expanded
+                    .get(&dummy_entity)
+                    .copied()
+                    .unwrap_or(true), // Default expanded
+                is_dummy_parent: true,
+                is_preserve_disk: false, // Dummy parents are never preserve disk
+                is_preserve_disk_transform: false, // Dummy parents are never preserve disk transform
+            };
+
+            hierarchy_entries.push(dummy_entry);
+        }
+    }
+
+    // Update real entities - set dummy parent for PreserveDiskFull entities that are currently root-level
+    for mut entry in real_entities {
+        if let Some(spawn_source_path) = file_groups
+            .iter()
+            .find(|(_, entities)| entities.contains(&entry.entity))
+            .map(|(path, _)| path)
+        {
+            // Only reparent if the entity doesn't already have a real parent
+            if entry.parent.is_none() {
+                if let Some(&dummy_parent) = dummy_parent_entities.get(spawn_source_path) {
+                    entry.parent = Some(dummy_parent);
+                }
+            }
+        }
+
+        hierarchy_entries.push(entry);
+    }
+
+    hierarchy_entries.sort_by(|a, b| {
+        match (a.is_dummy_parent, b.is_dummy_parent) {
+            (true, false) => std::cmp::Ordering::Less, // Dummy parents first
+            (false, true) => std::cmp::Ordering::Greater, // Real entities after
+            (true, true) => a.name.cmp(&b.name),       // Sort dummy parents by file path
+            (false, false) => a.entity.index().cmp(&b.entity.index()), // Sort real entities by entity index
+        }
+    });
+
     data.hierarchy = hierarchy_entries;
 }

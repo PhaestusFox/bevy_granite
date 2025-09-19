@@ -3,7 +3,7 @@ use crate::{
     interface::{
         events::{
             PopupMenuRequestedEvent, RequestCameraEntityFrame, RequestEditorToggle,
-            RequestToggleCameraSync,
+            RequestToggleCameraSync, SetActiveWorld,
         },
         panels::{
             bottom_panel::{BottomDockState, BottomTab},
@@ -20,8 +20,8 @@ use crate::{
 use bevy::{ecs::system::Commands, prelude::ResMut};
 use bevy_egui::egui;
 use bevy_granite_core::{
-    RequestDespawnBySource, RequestDespawnSerializableEntities, RequestLoadEvent, RequestSaveEvent,
-    UserInput,
+    entities::SaveSettings, RequestDespawnBySource, RequestDespawnSerializableEntities,
+    RequestLoadEvent, RequestSaveEvent, UserInput,
 };
 use bevy_granite_gizmos::selection::events::EntityEvent;
 use native_dialog::FileDialog;
@@ -72,9 +72,11 @@ pub fn top_bar_ui(
                         .show_open_single_file()
                         .unwrap()
                     {
-                        events
-                            .load
-                            .write(RequestLoadEvent(path.display().to_string()));
+                        events.load.write(RequestLoadEvent(
+                            path.display().to_string(),
+                            SaveSettings::Runtime,
+                            None,
+                        ));
                     }
                     ui.close();
                 }
@@ -110,12 +112,46 @@ pub fn top_bar_ui(
                     }
                 });
 
+                ui.menu_button("Set Active Scene", |ui| {
+                    ui.label(format!(
+                        "Available Sources ({}):",
+                        editor_state.loaded_sources.len()
+                    ));
+
+                    if editor_state.loaded_sources.is_empty() {
+                        ui.label("  (No sources loaded)");
+                    } else {
+                        let sources: Vec<String> =
+                            editor_state.loaded_sources.iter().cloned().collect();
+                        for source in sources {
+                            let is_current = editor_state
+                                .current_file
+                                .as_ref()
+                                .map(|current| current == &source)
+                                .unwrap_or(false);
+
+                            let button_text = if is_current {
+                                format!("[ACTIVE] {}", source)
+                            } else {
+                                source.clone()
+                            };
+
+                            if ui.button(button_text).clicked() {
+                                events.set_active_world.write(SetActiveWorld(source));
+                                ui.close();
+                            }
+                        }
+                    }
+                });
+
                 ui.separator();
 
                 if ui.button("Open Default World").clicked() {
-                    events
-                        .load
-                        .write(RequestLoadEvent(editor_state.default_world.clone()));
+                    events.load.write(RequestLoadEvent(
+                        editor_state.default_world.clone(),
+                        SaveSettings::Runtime,
+                        None,
+                    ));
                     ui.close();
                 }
 
@@ -200,13 +236,6 @@ pub fn top_bar_ui(
         // Buttons
         ui.horizontal(|ui| {
             ui.separator();
-            if ui.button("Show Help (H) ").clicked() {
-                events.popup.write(PopupMenuRequestedEvent {
-                    popup: PopupType::Help,
-                    mouse_pos: user_input.mouse_pos,
-                });
-            }
-            ui.separator();
             if ui.button("Add Entity (Shft + A) ").clicked() {
                 events.popup.write(PopupMenuRequestedEvent {
                     popup: PopupType::AddEntity,
@@ -221,12 +250,19 @@ pub fn top_bar_ui(
                 });
             }
             ui.separator();
-            if ui.button("Toggle Editor (F1) ").clicked() {
+            if ui.button("Show Help (F1) ").clicked() {
+                events.popup.write(PopupMenuRequestedEvent {
+                    popup: PopupType::Help,
+                    mouse_pos: user_input.mouse_pos,
+                });
+            }
+            ui.separator();
+            if ui.button("Toggle Editor (F2) ").clicked() {
                 events.toggle_editor.write(RequestEditorToggle);
             }
 
             ui.separator();
-            if ui.button("Toggle Camera Control (F2) ").clicked() {
+            if ui.button("Toggle Camera Control (F3) ").clicked() {
                 events.toggle_cam_sync.write(RequestToggleCameraSync);
             }
 

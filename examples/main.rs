@@ -1,7 +1,7 @@
-// main.rs - bevy 0.14
-use bevy::{input::keyboard::Key, prelude::*};
+// main.rs - bevy 0.16
+use bevy::prelude::*;
 use bevy_granite::prelude::*;
-use bevy_inspector_egui::bevy_egui::{EguiContext, EguiContexts}; // Import the Granite plugin prelude
+use bevy_granite_core::entities::SaveSettings;
 
 const STARTING_WORLD: &str = "scenes/starting.scene"; // Your starting world file. Doesn't have to actually exist yet
 
@@ -49,7 +49,11 @@ fn main() {
 }
 
 fn setup(mut open_event: EventWriter<RequestLoadEvent>) {
-    // Event to load a world (.scene)
+    // Event to load a world (.scene) with optional offset Transform
     // When finished loading it will send a `WorldLoadSuccessEvent` with the loaded world str name
-    open_event.write(RequestLoadEvent(STARTING_WORLD.to_string()));
+    open_event.write(RequestLoadEvent(
+        STARTING_WORLD.to_string(),
+        SaveSettings::Runtime,
+        None,
+    ));
 }

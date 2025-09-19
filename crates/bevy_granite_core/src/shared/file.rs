@@ -1,16 +1,21 @@
 use bevy::asset::io::file::FileAssetReader;
-use std::{borrow::Cow, path::Path};
+use std::{
+    borrow::Cow,
+    path::{Path, PathBuf},
+};
 
-pub fn rel_asset_to_absolute<'a>(rel_string: &'a str) -> Cow<'a, str> {
-    if !Path::new(&rel_string).is_absolute() {
+pub fn rel_asset_to_absolute(rel_string: &str) -> Cow<'static, str> {
+    let normalized_rel = rel_string.replace('\\', "/");
+    
+    let abs_path: PathBuf = if !Path::new(&normalized_rel).is_absolute() {
         FileAssetReader::get_base_path()
-            .join(format!("assets/{}", rel_string))
-            .to_string_lossy()
-            .to_string()
-            .into()
+            .join("assets")
+            .join(&normalized_rel)
     } else {
-        rel_string.into()
-    }
+        PathBuf::from(&normalized_rel)
+    };
+
+    abs_path.to_string_lossy().replace('\\', "/").into()
 }
 
 pub fn absolute_asset_to_rel(abs_string: String) -> Cow<'static, str> {
@@ -20,15 +25,11 @@ pub fn absolute_asset_to_rel(abs_string: String) -> Cow<'static, str> {
         let base_assets_path = FileAssetReader::get_base_path().join("assets");
 
         if let Ok(rel_path) = abs_path.strip_prefix(&base_assets_path) {
-            rel_path
-                .to_string_lossy()
-                .to_string()
-                .replace("\\", "/")
-                .into()
+            rel_path.to_string_lossy().replace('\\', "/").into()
         } else {
-            abs_string.into()
+            abs_string.replace('\\', "/").into()
         }
     } else {
-        abs_string.into()
+        abs_string.replace('\\', "/").into()
     }
 }

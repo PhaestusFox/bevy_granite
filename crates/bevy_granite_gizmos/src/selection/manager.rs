@@ -90,16 +90,16 @@ pub fn deselect_entity(
 ) {
     match event.event() {
         EntityEvent::Deselect { target } => {
-            commands.entity(*target).remove::<Selected>();
+            commands.entity(*target).remove::<(ActiveSelection, Selected)>();
         }
         EntityEvent::DeselectRange { range } => {
             for entity in range {
-                commands.entity(*entity).remove::<Selected>();
+                commands.entity(*entity).remove::<(ActiveSelection, Selected)>();
             }
         }
         EntityEvent::DeselectAll => {
             for entity in selection.iter() {
-                commands.entity(entity).remove::<Selected>();
+                commands.entity(entity).remove::<(ActiveSelection, Selected)>();
             }
         }
         _ => {}
@@ -151,15 +151,28 @@ pub fn handle_picking_selection(
         }
         Err(_) => {}
     }
-    if on_click.target().index() == 0 || user_input.mouse_over_egui {
+    if user_input.mouse_over_egui {
         log!(
             LogType::Editor,
             LogLevel::Info,
             LogCategory::Input,
-            "Clicked on window or egui, ignoring"
+            "Clicked on egui, ignoring"
         );
         return;
     }
+    
+    if on_click.target().index() == 0 {
+        log!(
+            LogType::Editor,
+            LogLevel::Info,
+            LogCategory::Input,
+            "Clicked on empty space, deselecting all entities"
+        );
+        on_click.propagate(false);
+        commands.trigger(EntityEvent::DeselectAll);
+        return;
+    }
+    
     on_click.propagate(false);
     let mut entity = on_click.target();
 

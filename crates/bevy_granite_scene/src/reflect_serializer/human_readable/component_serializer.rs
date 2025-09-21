@@ -4,7 +4,7 @@ use bevy::reflect::{Reflect, TypeRegistry};
 use bevy_granite_core::EditorIgnore;
 
 use crate::reflect_serializer::ComponentSerializeError;
-use crate::scene::{SceneFormat, SceneFormatDyn};
+use crate::scene::{SceneFormatWright, SceneFormatWrightDyn};
 use crate::{MetaData, pwrite};
 
 pub struct ComponentSerializer<'a, W> {
@@ -12,7 +12,7 @@ pub struct ComponentSerializer<'a, W> {
     stream: &'a mut W,
     indent: usize,
     metadata: &'a MetaData,
-    data: &'a mut dyn SceneFormatDyn<W>,
+    data: &'a mut dyn SceneFormatWrightDyn<W>,
 }
 
 impl<'a, W> ComponentSerializer<'a, W> {
@@ -21,7 +21,7 @@ impl<'a, W> ComponentSerializer<'a, W> {
         stream: &'a mut W,
         indent: usize,
         metadata: &'a MetaData,
-        data: &'a mut dyn SceneFormatDyn<W>,
+        data: &'a mut dyn SceneFormatWrightDyn<W>,
     ) -> Self {
         Self {
             type_registry,

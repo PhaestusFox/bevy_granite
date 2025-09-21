@@ -60,6 +60,31 @@ fn world_saver_verbose() {
     )
     .expect("can create scene saver");
     serialiser.serialize_world().expect("can serialize world");
+
+    let mut app_new = App::new();
+    app_new.insert_resource(Seed(42));
+    app_new.init_resource::<EntitiesForTest>();
+    app_new.add_systems(Startup, data_generation::spawn_entitys);
+    init_type_registry(&mut app_new);
+    crate::reflect_serializer::register_garnet_serialize_types(&mut app_new);
+
+    app_new.update();
+
+    let world = app_new.world_mut();
+    let mut loader = crate::scene::SceneLoader::new(
+        world,
+        format!(
+            "{}/../../assets/scenes/verbose_scene.garnet",
+            std::env::current_dir().unwrap().display()
+        ),
+    )
+    .expect("can create scene loader");
+    loader.load_scene().expect("can load scene");
+
+    let meta = loader.crack();
+    app_new.update();
+
+    // check entities in world a = world b
 }
 
 #[test]
@@ -82,6 +107,31 @@ fn world_saver_reduced() {
     )
     .expect("can create scene saver");
     serialiser.serialize_world().expect("can serialize world");
+
+    let mut app_new = App::new();
+    app_new.insert_resource(Seed(42));
+    app_new.init_resource::<EntitiesForTest>();
+    app_new.add_systems(Startup, data_generation::spawn_entitys);
+    init_type_registry(&mut app_new);
+    crate::reflect_serializer::register_garnet_serialize_types(&mut app_new);
+
+    app_new.update();
+
+    let world = app_new.world_mut();
+    let mut loader = crate::scene::SceneLoader::new(
+        world,
+        format!(
+            "{}/../../assets/scenes/reduced_scene.garnet",
+            std::env::current_dir().unwrap().display()
+        ),
+    )
+    .expect("can create scene loader");
+    loader.load_scene().expect("can load scene");
+
+    let meta = loader.crack();
+    app_new.update();
+
+    // check entities in world a = world b
 }
 
 fn init_type_registry(app: &mut App) {

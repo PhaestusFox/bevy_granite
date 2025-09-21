@@ -143,7 +143,7 @@ impl<'a, W: std::fmt::Write> ReflectSerializer<'a, W> {
                     .into(),
                 );
             };
-            let Some(entity) = self.metadata.get(entity) else {
+            let Some(entity) = self.metadata.entity_map.get(entity) else {
                 return Err(crate::scene::SceneFormatError::EntityNotReserved(*entity));
             };
             write!(self.stream, "{}", entity.id)?;

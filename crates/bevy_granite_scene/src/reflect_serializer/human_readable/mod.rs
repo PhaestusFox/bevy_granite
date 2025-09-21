@@ -5,3 +5,6 @@ mod reflect_serializer;
 pub use component_serializer::ComponentSerializer;
 pub use entity_serializer::EntitySerializer;
 pub use reflect_serializer::ReflectSerializer;
+
+mod entity_deserializer;
+pub use entity_deserializer::EntityDeSerializer;

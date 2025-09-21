@@ -1,12 +1,12 @@
 use super::*;
 
 pub struct SceneSaver<'a, W> {
-    entity_map: MetaData,
+    meta: MetaData,
     register: AppTypeRegistry,
     components: &'a Components,
     world: &'a World,
     indent: usize,
-    data: Box<dyn SceneFormatDyn<W>>,
+    data: Box<dyn SceneFormatWrightDyn<W>>,
     file: W,
 }
 
@@ -34,7 +34,7 @@ impl<W: std::io::Write> core::fmt::Write for IoWapper<W> {
 type FileWriter = IoWapper<std::io::BufWriter<std::fs::File>>;
 
 impl<'a> SceneSaver<'a, FileWriter> {
-    pub fn new<F: 'static + SceneFormatDyn<FileWriter> + Default>(
+    pub fn new<F: 'static + SceneFormatWrightDyn<FileWriter> + Default>(
         world: &'a World,
         file: impl AsRef<str>,
     ) -> std::io::Result<Self> {
@@ -44,7 +44,7 @@ impl<'a> SceneSaver<'a, FileWriter> {
         let writer = std::io::BufWriter::new(file);
         let writer = IoWapper { inner: writer };
         Ok(Self {
-            entity_map: EntityHashMap::default(),
+            meta: MetaData::default(),
             file: writer,
             register: world.resource::<AppTypeRegistry>().clone(),
             components: world.components(),
@@ -58,7 +58,7 @@ impl<'a, W> SceneSaver<'a, W> {
     #[inline]
     pub fn reserve_entity(&mut self, entity: Entity) {
         let id = uuid::Uuid::new_v4();
-        self.entity_map.insert(entity, EntityMetaData { id });
+        self.meta.add_entity(entity, EntityMetaData { id });
     }
 
     #[inline]
@@ -79,7 +79,7 @@ impl<'a, W> SceneSaver<'a, W> {
 
     #[inline]
     pub fn entity_count(&self) -> usize {
-        self.entity_map.len()
+        self.meta.entity_map.len()
     }
 
     #[inline]
@@ -109,6 +109,7 @@ impl<'a, W: std::fmt::Write> SceneSaver<'a, W> {
         }
         //add metadata to .garnet
         self.add_metadata()?;
+        //add format specific data to beginning of file
         self.data.add_head(&mut self.file)?;
         if self.entity_count() > 0 {
             self.serialize_entities()?;
@@ -116,7 +117,7 @@ impl<'a, W: std::fmt::Write> SceneSaver<'a, W> {
         if self.resource_count() > 0 {
             self.serialize_resources()?;
         }
-
+        //add format specific data to end of file
         self.data.add_tail(&mut self.file)?;
         Ok(())
     }
@@ -154,10 +155,10 @@ format_version: {};
                 self.components,
                 &mut self.file,
                 self.indent + 1,
-                &self.entity_map,
+                &self.meta,
                 self.data.as_mut(),
             );
-        for entity in self.entity_map.keys() {
+        for entity in self.meta.entity_map.keys() {
             entitiy_serializer.serialize_entity(*entity, self.world)?;
         }
         Ok(())

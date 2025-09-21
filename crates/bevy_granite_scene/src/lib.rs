@@ -5,7 +5,7 @@ mod reflect_serializer;
 mod scene;
 
 type Result<T> = std::result::Result<T, scene::SceneFormatError>;
-type MetaData = EntityHashMap<scene::EntityMetaData>;
+type MetaData = scene::SceneMetadata;
 
 #[macro_export]
 macro_rules! pwrite {

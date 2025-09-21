@@ -95,7 +95,7 @@ mod test;
 mod human_readable;
 
 use bevy::reflect::reflect_trait;
-pub use human_readable::EntitySerializer;
+pub use human_readable::{EntityDeSerializer, EntitySerializer};
 
 #[derive(thiserror::Error, Debug)]
 pub enum ComponentSerializeError {

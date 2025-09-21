@@ -180,7 +180,7 @@ bitflags::bitflags! {
     /// A marker component that an entity should be ignored by the editor
     /// This will be more powerful then not having Bridge
     /// As this is explicitly added to an entity
-    #[derive(bevy::ecs::component::Component, Default, Clone, Copy)]
+    #[derive(bevy::ecs::component::Component, Default)]
     pub struct EditorIgnore: usize {
         const GIZMO = 1;
         const PICKING = 2;

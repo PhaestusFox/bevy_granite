@@ -18,6 +18,8 @@ pub fn editor_gizmos_ui(
     selected_entity: Query<&Gizmos, With<ActiveSelection>>,
     mut gizmos: Query<&mut GizmoConfig>,
 ) {
+    let small_spacing = 1.;
+    let spacing = 4.;
     egui::Window::new("Gizmos")
         .resizable(false)
         .title_bar(false)
@@ -52,21 +54,9 @@ pub fn editor_gizmos_ui(
                         .changed();
 
                     if matches!(active, GizmoType::Transform) {
-                        ui.add_space(10.0);
-                        egui::ComboBox::new("GizmoMode", "Mode")
-                            .selected_text(match mode {
-                                GizmoMode::Local => "Local",
-                                GizmoMode::Global => "Global",
-                            })
-                            .show_ui(ui, |ui| {
-                                changed |= ui
-                                    .selectable_value(&mut mode, GizmoMode::Local, "Local")
-                                    .changed();
-                                changed |= ui
-                                    .selectable_value(&mut mode, GizmoMode::Global, "Global")
-                                    .changed();
-                            });
+                        ui.add_space(spacing);
                         ui.label("Snap:");
+                        ui.add_space(small_spacing);
                         changed |= ui
                             .add(
                                 egui::DragValue::new(&mut gizmo_snap.transform_value)
@@ -74,10 +64,8 @@ pub fn editor_gizmos_ui(
                                     .range(0.0..=360.0),
                             )
                             .changed();
-                    }
-                    if matches!(active, GizmoType::Rotate) {
-                        ui.add_space(10.0);
-                        egui::ComboBox::new("GizmoMode", "Mode")
+                        ui.add_space(spacing);
+                        egui::ComboBox::new("GizmoMode", "")
                             .selected_text(match mode {
                                 GizmoMode::Local => "Local",
                                 GizmoMode::Global => "Global",
@@ -90,7 +78,12 @@ pub fn editor_gizmos_ui(
                                     .selectable_value(&mut mode, GizmoMode::Global, "Global")
                                     .changed();
                             });
+                    }
+
+                    if matches!(active, GizmoType::Rotate) {
+                        ui.add_space(spacing);
                         ui.label("Snap°:");
+                        ui.add_space(small_spacing);
                         changed |= ui
                             .add(
                                 egui::DragValue::new(&mut gizmo_snap.rotate_value)
@@ -98,6 +91,21 @@ pub fn editor_gizmos_ui(
                                     .range(0.0..=360.0),
                             )
                             .changed();
+
+                        ui.add_space(spacing);
+                        egui::ComboBox::new("GizmoMode", "")
+                            .selected_text(match mode {
+                                GizmoMode::Local => "Local",
+                                GizmoMode::Global => "Global",
+                            })
+                            .show_ui(ui, |ui| {
+                                changed |= ui
+                                    .selectable_value(&mut mode, GizmoMode::Local, "Local")
+                                    .changed();
+                                changed |= ui
+                                    .selectable_value(&mut mode, GizmoMode::Global, "Global")
+                                    .changed();
+                            });
                     }
                 });
                 if changed {

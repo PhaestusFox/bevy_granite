@@ -1,6 +1,5 @@
 use bevy::{
     ecs::hierarchy::{ChildOf, Children},
-    gizmos::config,
     pbr::{MeshMaterial3d, NotShadowCaster, NotShadowReceiver},
     prelude::{
         AlphaMode, Assets, Color, Commands, Component, Cone, Cylinder, Entity, GlobalTransform,

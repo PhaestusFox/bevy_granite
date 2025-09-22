@@ -1,7 +1,6 @@
 use crate::selection::{events::EntityEvent, ActiveSelection, Selected};
 use bevy::{
     ecs::{observer::Trigger, world::OnAdd},
-    input::{keyboard::KeyCode, ButtonInput},
     prelude::{Component, Entity, Query, Res, With},
 };
 use bevy::{
@@ -116,12 +115,6 @@ pub fn single_active(
     add_active.propagate(false);
     if active_selection.single().is_err() {
         for entity in &active_selection {
-            //log(
-            //    LogType::Editor,
-            //    LogLevel::Info,
-            //    LogCategory::Input,
-            //    format!("Entity {} is no longer active", entity.index()),
-            //);
             if entity != add_active.target() {
                 commands.entity(entity).remove::<ActiveSelection>();
             }
@@ -152,12 +145,6 @@ pub fn handle_picking_selection(
         Err(_) => {}
     }
     if user_input.mouse_over_egui {
-        //log!(
-        //    LogType::Editor,
-        //    LogLevel::Info,
-        //    LogCategory::Input,
-        //    "Clicked on egui, ignoring"
-        //);
         return;
     }
     

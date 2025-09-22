@@ -3,7 +3,7 @@ use super::{
     hierarchy::{detect_changes, update_hierarchy_data},
     selection::{
         handle_external_selection_change, process_selection_changes, update_tree_click_protection,
-        validation::is_valid_drop,
+        update_scroll_delay, validation::is_valid_drop,
     },
     RequestReparentEntityEvent,
 };
@@ -17,7 +17,7 @@ use bevy::ecs::query::Has;
 use bevy::ecs::system::Commands;
 use bevy::{
     ecs::query::{Changed, Or},
-    prelude::{ChildOf, Entity, EventWriter, Name, Query, Res, ResMut, With},
+    prelude::{ChildOf, Entity, EventWriter, Name, Query, Res, ResMut, With, RemovedComponents},
 };
 use bevy_granite_core::{
     IdentityData, RequestDespawnBySource, RequestReloadEvent, SpawnSource, TreeHiddenEntity,
@@ -40,8 +40,9 @@ pub fn update_node_tree_tabs_system(
     )>,
     changed_hierarchy: Query<
         (Has<GizmoChildren>, Has<GizmoMesh>, Has<TreeHiddenEntity>),
-        Or<(Changed<Name>, Changed<IdentityData>, Changed<SpawnSource>)>,
+        Or<(Changed<Name>, Changed<IdentityData>, Changed<SpawnSource>, Changed<ChildOf>)>,
     >,
+    mut removed_child_of: RemovedComponents<ChildOf>,
     mut commands: Commands,
     mut editor_events: EditorEvents,
     mut reparent_event_writer: EventWriter<RequestReparentEntityEvent>,
@@ -53,41 +54,38 @@ pub fn update_node_tree_tabs_system(
             data.selected_entities = all_selected.iter().collect();
             data.active_scene_file = editor_state.current_file.clone();
 
-            let (entities_changed, data_changed, hierarchy_changed) = if data.filtered_hierarchy {
-                let q = hierarchy_query
-                    .iter()
-                    .filter(|(_, _, _, _, _, a)| !(a.0 || a.1 || a.2))
-                    .map(|(a, b, c, d, e, _)| (a, b, c, d, e));
-                let c = changed_hierarchy
-                    .iter()
-                    .any(|filter| !(filter.0 || filter.1 || filter.2));
-                detect_changes(q, c, data)
+            let has_changes = !changed_hierarchy.is_empty() || !removed_child_of.is_empty();
+            for _ in removed_child_of.read() {}
+            
+            if !has_changes && !data.hierarchy.is_empty() {
+                // No changes
             } else {
-                let q = hierarchy_query
-                    .iter()
-                    .map(|(a, b, c, d, e, _)| (a, b, c, d, e));
-                let c = !changed_hierarchy.is_empty();
-                detect_changes(q, c, data)
-            };
-
-            if entities_changed || data_changed || hierarchy_changed {
-                if data.filtered_hierarchy {
-                    let q = hierarchy_query
+                let filtered_entities: Vec<_> = if data.filtered_hierarchy {
+                    hierarchy_query
                         .iter()
                         .filter(|(_, _, _, _, _, a)| !(a.0 || a.1 || a.2))
-                        .map(|(a, b, c, d, e, _)| (a, b, c, d, e));
-                    update_hierarchy_data(data, q, hierarchy_changed);
+                        .map(|(a, b, c, d, e, _)| (a, b, c, d, e))
+                        .collect()
                 } else {
-                    let q = hierarchy_query
+                    hierarchy_query
                         .iter()
-                        .map(|(a, b, c, d, e, _)| (a, b, c, d, e));
-                    update_hierarchy_data(data, q, hierarchy_changed);
+                        .map(|(a, b, c, d, e, _)| (a, b, c, d, e))
+                        .collect()
+                };
+                
+                let (entities_changed, data_changed, hierarchy_changed) = 
+                    detect_changes(filtered_entities.iter().cloned(), has_changes, data);
+
+                if entities_changed || data_changed || hierarchy_changed {
+                    update_hierarchy_data(data, filtered_entities, hierarchy_changed);
+                    data.tree_cache_dirty = true;
                 }
             }
 
             handle_external_selection_change(data, previous_selection);
             process_selection_changes(data, &mut commands);
             update_tree_click_protection(data);
+            update_scroll_delay(data);
             handle_drag_drop_events(
                 data,
                 &mut reparent_event_writer,
@@ -106,7 +104,6 @@ fn handle_drag_drop_events(
     if let Some(dragged_entities) = data.drag_payload.clone() {
         if let Some(drop_target) = data.drop_target {
             if drop_target == Entity::PLACEHOLDER {
-                // Special case: drop on empty space = remove parents
                 log!(
                     LogType::Editor,
                     LogLevel::Info,
@@ -131,7 +128,6 @@ fn handle_drag_drop_events(
                 });
             }
 
-            // Clear drag state after processing
             data.drag_payload = None;
             data.drop_target = None;
         }
@@ -147,7 +143,7 @@ fn process_context_actions(
     for action in data.pending_context_actions.drain(..) {
         match action {
             PendingContextAction::DeleteEntity(entity) => {
-                commands.entity(entity).despawn();
+                commands.entity(entity).try_despawn();
             }
             PendingContextAction::SetActiveScene(scene_path) => {
                 events.set_active_world.write(SetActiveWorld(scene_path));

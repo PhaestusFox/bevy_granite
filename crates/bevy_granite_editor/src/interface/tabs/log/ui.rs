@@ -165,9 +165,9 @@ pub fn log_tab_ui(ui: &mut egui::Ui, data: &mut LogTabData) {
 
                     // Log display area
                     let extreme_bg = ui.ctx().style().visuals.extreme_bg_color;
-                    Frame::none()
+                    Frame::NONE
                         .fill(extreme_bg)
-                        .inner_margin(Margin::same(large_spacing))
+                        .inner_margin(Margin::same(large_spacing as i8))
                         .show(ui, |ui| {
                             egui::ScrollArea::vertical()
                                 .stick_to_bottom(true)

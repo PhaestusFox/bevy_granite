@@ -1,26 +1,26 @@
 use crate::{
     entities::{serialize_entities, ComponentEditor, HasRuntimeData, IdentityData, SpawnSource},
     events::{CollectRuntimeDataEvent, RequestSaveEvent, RuntimeDataReadyEvent},
-    shared::absolute_asset_to_rel, WorldSaveSuccessEvent,
+    shared::absolute_asset_to_rel,
+    WorldSaveSuccessEvent,
 };
 use bevy::{
     asset::io::file::FileAssetReader,
-    ecs::{entity::Entity, system::Resource},
-    hierarchy::Parent,
-    prelude::{Commands, EventReader, EventWriter, Query, ResMut, World},
+    ecs::entity::Entity,
+    prelude::{ChildOf, Commands, EventReader, EventWriter, Query, ResMut, Resource, World},
     transform::components::Transform,
 };
 use bevy_granite_logging::{
     config::{LogCategory, LogLevel, LogType},
     log,
 };
-use std::collections::HashMap;
 use std::path::PathBuf;
+use std::{borrow::Cow, collections::HashMap};
 
 #[derive(Default, Debug, Clone)]
 pub struct WorldState {
     // Can easily be queried for, so we can immediately get this data
-    pub entity_data: Option<Vec<(Entity, IdentityData, Transform, Option<Entity>)>>, // Added parent entity and UUID
+    pub entity_data: Option<Vec<(Entity, IdentityData, Transform, Option<Entity>, crate::entities::SaveSettings)>>, // Added parent entity, UUID, and SaveSettings
 
     // More difficult to get, so we do no have this off rip
     // We need to use World and the type registry to build and send event back saying its ready
@@ -32,7 +32,7 @@ pub struct WorldState {
 
 #[derive(Resource, Default)]
 pub struct SaveWorldRequestData {
-    pub pending_saves: HashMap<String, (PathBuf, WorldState)>, // source -> (path, world_state)
+    pub pending_saves: HashMap<Cow<'static, str>, (PathBuf, WorldState)>, // source -> (path, world_state)
 }
 
 /// Part 1.
@@ -45,12 +45,18 @@ pub fn save_request_system(
     mut save_request: ResMut<SaveWorldRequestData>,
     mut event_writer: EventWriter<CollectRuntimeDataEvent>,
     mut event_reader: EventReader<RequestSaveEvent>,
-    query: Query<(Entity, &IdentityData, Option<&Transform>, Option<&Parent>, &SpawnSource)>,
+    query: Query<(
+        Entity,
+        &IdentityData,
+        Option<&Transform>,
+        Option<&ChildOf>,
+        &SpawnSource,
+    )>,
 ) {
     // Process only one save request per frame to avoid conflicts
     if let Some(RequestSaveEvent(path)) = event_reader.read().next() {
         let spawn_source = absolute_asset_to_rel(path.clone());
-        
+
         log!(
             LogType::Editor,
             LogLevel::Info,
@@ -59,21 +65,22 @@ pub fn save_request_system(
             spawn_source,
             path
         );
-        
-        event_writer.send(CollectRuntimeDataEvent(spawn_source.clone()));
+
+        event_writer.write(CollectRuntimeDataEvent(spawn_source.to_string()));
 
         // Part 1.
         // Gather all entities that are serializeable and contain IdentityData and Transform
         // Filter by SpawnSource to only include entities from the target source
-        let entities_data: Vec<(Entity, IdentityData, Transform, Option<Entity>)> = query
+        let entities_data: Vec<(Entity, IdentityData, Transform, Option<Entity>, crate::entities::SaveSettings)> = query
             .iter()
-            .filter(|(_, _, _, _, source)| source.0 == spawn_source)
-            .map(|(entity, obj, transform, parent, _)| {
+            .filter(|(_, _, _, _, source)| source.str_ref() == spawn_source)
+            .map(|(entity, obj, transform, relation, source)| {
                 (
                     entity,
                     obj.clone(),
                     transform.cloned().unwrap_or_default(),
-                    parent.map(|p| p.get()),
+                    relation.map(|r| r.parent()),
+                    source.save_settings_ref().clone(),
                 )
             })
             .collect();
@@ -107,8 +114,10 @@ pub fn save_request_system(
             component_data: None,
             components_ready: false,
         };
-        
-        save_request.pending_saves.insert(spawn_source.clone(), (asset_path.clone(), world_state));
+
+        save_request
+            .pending_saves
+            .insert(spawn_source.clone(), (asset_path.clone(), world_state));
 
         log!(
             LogType::Editor,
@@ -140,7 +149,7 @@ pub fn collect_components_system(
         // Filter entities to only include those with matching SpawnSource
         let entities: Vec<Entity> = runtime_query
             .iter()
-            .filter(|(_, _, source)| source.0 == *spawn_source)
+            .filter(|(_, _, source)| source.str_ref() == *spawn_source)
             .map(|(entity, _, _)| entity)
             .collect();
 
@@ -154,15 +163,16 @@ pub fn collect_components_system(
         );
 
         // Clone spawn_source for the closure
-        let spawn_source_clone = spawn_source.clone();
+        let spawn_source_clone: Cow<'static, str> = spawn_source.clone().into();
 
         // Need access to world to get components
-        commands.add(move |world: &mut World| {
+        commands.queue(move |world: &mut World| {
             let component_editor = world.resource::<ComponentEditor>();
             let mut collected_data = HashMap::new();
 
             for entity in entities {
-                let serialized_components = component_editor.serialize_entity_components(world, entity);
+                let serialized_components =
+                    component_editor.serialize_entity_components(world, entity);
 
                 if !serialized_components.is_empty() {
                     collected_data.insert(entity, serialized_components);
@@ -181,7 +191,7 @@ pub fn collect_components_system(
                 if let Some((_, world_state)) = data.pending_saves.get_mut(&spawn_source_clone) {
                     world_state.component_data = Some(collected_data);
                     world_state.components_ready = true;
-                    
+
                     log!(
                         LogType::Game,
                         LogLevel::Info,
@@ -189,8 +199,8 @@ pub fn collect_components_system(
                         "Sending RuntimeDataReadyEvent for source: {}",
                         spawn_source_clone
                     );
-                    
-                    world.send_event(RuntimeDataReadyEvent(spawn_source_clone.clone()));
+
+                    world.send_event(RuntimeDataReadyEvent(spawn_source_clone.to_string()));
                 }
             }
         });
@@ -211,7 +221,8 @@ pub fn save_data_ready_system(
             "Save data ready for source: {}",
             source
         );
-        
+        let source: &str = source.as_ref();
+
         if let Some((path, world_state)) = save_request_data.pending_saves.remove(source) {
             if !world_state.components_ready {
                 log!(
@@ -239,7 +250,7 @@ pub fn save_data_ready_system(
                 "Saved world: {:?}",
                 path
             );
-            saved_event_writer.send(WorldSaveSuccessEvent(path.display().to_string()));
+            saved_event_writer.write(WorldSaveSuccessEvent(path.display().to_string()));
         } else {
             log!(
                 LogType::Game,

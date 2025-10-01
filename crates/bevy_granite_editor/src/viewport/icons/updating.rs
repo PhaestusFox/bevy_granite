@@ -3,13 +3,15 @@ use crate::editor_state::EditorState;
 use bevy::{
     color::Color,
     math::Vec3,
-    pbr::StandardMaterial,
-    prelude::{Assets, Entity, Handle, Query, Res, ResMut, Transform, With, Without},
+    pbr::{MeshMaterial3d, StandardMaterial},
+    prelude::{Assets, Entity, Query, Res, ResMut, Transform, With, Without},
     render::view::Visibility,
     transform::components::GlobalTransform,
 };
 use bevy_granite_core::UICamera;
-use bevy_granite_gizmos::{ActiveSelection, DragState, GizmoType, Selected, SelectedGizmo};
+use bevy_granite_gizmos::{
+    gizmos::NewGizmoType, ActiveSelection, DragState, GizmoType, Selected,
+};
 
 pub fn update_icon_entities_system(
     mut icon_query: Query<
@@ -17,12 +19,12 @@ pub fn update_icon_entities_system(
             &IconEntity,
             &mut Transform,
             &mut Visibility,
-            &Handle<StandardMaterial>,
+            &MeshMaterial3d<StandardMaterial>,
         ),
         With<IconEntity>,
     >,
     drag_state: Res<DragState>,
-    selected_gizmo: Res<SelectedGizmo>,
+    selected_gizmo: Res<NewGizmoType>,
     active_query: Query<Entity, With<ActiveSelection>>,
     mut selected_query: Query<Entity, (With<Selected>, Without<ActiveSelection>)>,
     target_query: Query<&GlobalTransform, Without<IconEntity>>,
@@ -30,7 +32,7 @@ pub fn update_icon_entities_system(
     mut materials: ResMut<Assets<StandardMaterial>>,
     editor_state: Res<EditorState>,
 ) {
-    let rotating = drag_state.dragging && matches!(selected_gizmo.value, GizmoType::Rotate);
+    let rotating = drag_state.dragging && matches!(**selected_gizmo, GizmoType::Rotate);
     if !editor_state.active {
         // Hide all icons when editor is disabled
         for (_, _, mut visibility, _) in icon_query.iter_mut() {
@@ -40,7 +42,7 @@ pub fn update_icon_entities_system(
     }
     let config = &editor_state.config.viewport.visualizers;
 
-    let camera_transform = match camera_query.get_single() {
+    let camera_transform = match camera_query.single() {
         Ok(cam) => cam,
         Err(_) => return,
     };
@@ -56,7 +58,7 @@ pub fn update_icon_entities_system(
 
         // Hide active icon if not showing active icons
         if !config.icon_show_active {
-            if let Ok(target) = active_query.get_single() {
+            if let Ok(target) = active_query.single() {
                 if icon_entity.target_entity == target {
                     *visibility = Visibility::Hidden;
                 }
@@ -65,7 +67,7 @@ pub fn update_icon_entities_system(
 
         // Hide active when rotating
         if config.icon_show_active {
-            if let Ok(target) = active_query.get_single() {
+            if let Ok(target) = active_query.single() {
                 if icon_entity.target_entity == target {
                     if rotating {
                         *visibility = Visibility::Hidden;
@@ -85,7 +87,7 @@ pub fn update_icon_entities_system(
         // Update icon material color
         if let Some(material) = materials.get_mut(material_handle) {
             let mut color = Color::srgb_from_array(config.icon_color);
-            if let Ok(target) = active_query.get_single() {
+            if let Ok(target) = active_query.single() {
                 if icon_entity.target_entity == target {
                     color = Color::srgb_from_array(config.selection_active_color);
                 }
@@ -98,7 +100,6 @@ pub fn update_icon_entities_system(
             }
 
             material.base_color = color;
-
         }
 
         if let Ok(target_global_transform) = target_query.get(icon_entity.target_entity) {
@@ -136,15 +137,17 @@ pub fn update_icon_entities_system(
             icon_transform.rotation = parent_rotation.inverse() * world_billboard_rotation;
 
             // Apply world down offset only when entity is selected - gets visually messy
-            let is_active = active_query.get_single().map_or(false, |target| icon_entity.target_entity == target);
+            let is_active = active_query
+                .single()
+                .map_or(false, |target| icon_entity.target_entity == target);
             //let is_selected = selected_query.iter().any(|e| icon_entity.target_entity == e);
-            
+
             let world_down_offset = if is_active {
                 Vec3::new(0.0, -0.35, 0.0)
             } else {
                 Vec3::ZERO
             };
-            
+
             let local_down_offset = parent_rotation.inverse() * world_down_offset;
             icon_transform.translation = local_down_offset;
 

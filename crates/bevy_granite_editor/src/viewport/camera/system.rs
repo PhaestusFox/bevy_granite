@@ -1,18 +1,18 @@
 use crate::{
-    entities::bounds::get_entity_bounds_world,
     editor_state::INPUT_CONFIG,
+    entities::bounds::get_entity_bounds_world,
     interface::events::{RequestCameraEntityFrame, RequestToggleCameraSync},
     viewport::camera::{handle_movement, handle_zoom, rotate_camera_towards},
 };
 use bevy::{
-    asset::{Assets, Handle},
+    asset::Assets,
     ecs::entity::Entity,
     input::mouse::{MouseMotion, MouseWheel},
     prelude::{
         EventReader, Local, Query, Res, ResMut, Resource, Time, Transform, Vec2, Vec3, Window,
         With, Without,
     },
-    render::mesh::Mesh,
+    render::mesh::{Mesh, Mesh3d},
     transform::components::GlobalTransform,
     window::{CursorGrabMode, PrimaryWindow},
 };
@@ -88,7 +88,7 @@ pub fn camera_sync_toggle_system(
     for _event in toggle_event_writer.read() {
         // Store UI camera position when disabling sync (before UICamera takes control)
         if sync.ui_camera_has_control {
-            if let Ok(ui_camera_transform) = ui_camera_query.get_single() {
+            if let Ok(ui_camera_transform) = ui_camera_query.single() {
                 sync.ui_camera_old_position = Some(*ui_camera_transform);
             }
         }
@@ -112,7 +112,7 @@ pub fn camera_frame_system(
     selected_query: Query<Entity, With<Selected>>,
     active_query: Query<Entity, With<ActiveSelection>>,
     meshes: Res<Assets<Mesh>>,
-    mesh_query: Query<&Handle<Mesh>>, // Needed for bounds
+    mesh_query: Query<&Mesh3d>, // Needed for bounds
 ) {
     let frame_whole_selection = true;
     let base_distance: f32 = 10.;
@@ -263,16 +263,16 @@ pub fn mouse_button_iter(
         return;
     }
 
-    if let Ok(mut window) = primary_window.get_single_mut() {
+    if let Ok(mut window) = primary_window.single_mut() {
         if user_input.mouse_right.just_pressed {
-            window.cursor.visible = false;
-            window.cursor.grab_mode = CursorGrabMode::Locked;
+            window.cursor_options.visible = false;
+            window.cursor_options.grab_mode = CursorGrabMode::Locked;
             input_state.initial_cursor_pos = window.cursor_position();
         }
 
         if user_input.mouse_right.just_released {
-            window.cursor.visible = true;
-            window.cursor.grab_mode = CursorGrabMode::None;
+            window.cursor_options.visible = true;
+            window.cursor_options.grab_mode = CursorGrabMode::None;
             if let Some(pos) = input_state.initial_cursor_pos {
                 window.set_cursor_position(Some(pos));
             }
@@ -285,7 +285,7 @@ pub fn mouse_button_iter(
             &user_input,
             &mut mouse_motion_events,
             &mut target_pos,
-            time.delta_seconds(),
+            time.delta_secs(),
         );
     }
 

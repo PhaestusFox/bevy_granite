@@ -2,9 +2,10 @@ use bevy::{
     ecs::{
         event::{EventReader, EventWriter},
         query::With,
-        system::{Query, ResMut, Resource},
+        system::{Query, ResMut},
     },
     math::Vec2,
+    prelude::Resource,
     window::{PrimaryWindow, Window},
 };
 use bevy_egui::EguiContexts;
@@ -68,7 +69,7 @@ pub fn show_active_popups_system(
                 relationship_ui(&mut contexts, popup_state.popup_position, events)
             }
             PopupType::Help => {
-                if let Ok(window) = window_query.get_single() {
+                if let Ok(window) = window_query.single() {
                     help_ui(&mut contexts, window, editor_state)
                 } else {
                     false

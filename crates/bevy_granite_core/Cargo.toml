@@ -1,11 +1,11 @@
 [ package]
 name = "bevy_granite_core"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
 
 [dependencies]
 toml = { workspace = true }
-bevy = { workspace = true, features = ["bevy_pbr"] }
+bevy = { workspace = true, features = ["bevy_pbr", "png"] }
 bevy-inspector-egui = { workspace = true }
 bevy_egui = { workspace = true }
 bevy_obj = { workspace = true }
@@ -19,6 +19,7 @@ bevy_granite_logging = { path = "../bevy_granite_logging"}
 bevy_granite_macros = { path = "../bevy_granite_macros"}
 
 enum_dispatch = "0.3.13"
+bitflags = "*"
 
 
 [lib]

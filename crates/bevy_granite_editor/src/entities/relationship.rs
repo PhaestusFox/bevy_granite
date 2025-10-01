@@ -1,16 +1,22 @@
-use crate::interface::{events::{RequestNewParent, RequestRemoveChildren, RequestRemoveParents, RequestRemoveParentsFromEntities}, tabs::RequestReparentEntityEvent};
+use crate::interface::{
+    events::{
+        RequestNewParent, RequestRemoveChildren, RequestRemoveParents,
+        RequestRemoveParentsFromEntities,
+    },
+    tabs::RequestReparentEntityEvent,
+};
 use bevy::{
     ecs::{
         entity::Entity,
-        event::{EventReader, EventWriter},
+        event::EventReader,
         query::{With, Without},
         system::{Commands, Query},
     },
-    hierarchy::{Children, Parent},
+    prelude::{ChildOf, Children},
     transform::commands::BuildChildrenTransformExt,
 };
 use bevy_granite_core::IconProxy;
-use bevy_granite_gizmos::{ActiveSelection, RequestDeselectAllEntitiesEvent, Selected};
+use bevy_granite_gizmos::{selection::events::EntityEvent, ActiveSelection, Selected};
 use bevy_granite_logging::*;
 
 pub fn parent_from_node_tree_system(
@@ -32,7 +38,7 @@ pub fn parent_from_node_tree_system(
             commands
                 .entity(entity)
                 .set_parent_in_place(request.new_parent);
-            
+
             log!(
                 LogType::Editor,
                 LogLevel::Info,
@@ -59,26 +65,33 @@ pub fn parent_system(
     mut commands: Commands,
 ) {
     for _request in parent_request.read() {
-        if let Ok(active_entity) = active_selection.get_single() {
+        if let Ok(active_entity) = active_selection.single() {
             for selected_entity in selection.iter() {
                 commands
                     .entity(selected_entity)
                     .set_parent_in_place(active_entity);
             }
+            log!(
+                LogType::Editor,
+                LogLevel::OK,
+                LogCategory::Entity,
+                "New parent applied to selection"
+            );
+        } else {
+            log!(
+                LogType::Editor,
+                LogLevel::Warning,
+                LogCategory::Entity,
+                "No active entity to set as parent!"
+            );
         }
-        log!(
-            LogType::Editor,
-            LogLevel::OK,
-            LogCategory::Entity,
-            "New parent applied to selection"
-        );
     }
 }
 
 pub fn parent_removal_system(
     mut parent_request: EventReader<RequestRemoveParents>,
-    active_selection: Query<Entity, (With<ActiveSelection>, With<Parent>)>,
-    selection: Query<Entity, (With<Selected>, With<Parent>)>,
+    active_selection: Query<Entity, (With<ActiveSelection>, With<ChildOf>)>,
+    selection: Query<Entity, (With<Selected>, With<ChildOf>)>,
     mut commands: Commands,
 ) {
     for _request in parent_request.read() {
@@ -106,7 +119,7 @@ pub fn parent_removal_from_entities_system(
     for request in parent_request.read() {
         for &entity in &request.entities {
             commands.entity(entity).remove_parent_in_place();
-            
+
             log!(
                 LogType::Editor,
                 LogLevel::Info,
@@ -129,10 +142,9 @@ pub fn parent_removal_from_entities_system(
 pub fn child_removal_system(
     mut child_request: EventReader<RequestRemoveChildren>,
     selection: Query<Entity, (With<Selected>, With<Children>)>,
-    active_selection: Query<Entity, (With<ActiveSelection>, With<Parent>)>,
+    active_selection: Query<Entity, (With<ActiveSelection>, With<ChildOf>)>,
     children_query: Query<&Children>,
     icon_proxy_query: Query<(), With<IconProxy>>,
-    mut deselect_writer: EventWriter<RequestDeselectAllEntitiesEvent>,
     mut commands: Commands,
 ) {
     for _request in child_request.read() {
@@ -158,7 +170,7 @@ pub fn child_removal_system(
 
         // Gizmo has weird issue where it stays in place when children are removed
         // so we deselect all entities to ensure it updates correctly
-        deselect_writer.send(RequestDeselectAllEntitiesEvent);
+        commands.trigger(EntityEvent::DeselectAll);
 
         log!(
             LogType::Editor,

@@ -2,14 +2,14 @@ use super::{
     AvailableEditableMaterials, EditableMaterial, EditableMaterialError, EditableMaterialField,
     StandardMaterialDef,
 };
+use bevy::image::{
+    ImageAddressMode, ImageFilterMode, ImageLoaderSettings, ImageSampler, ImageSamplerDescriptor,
+};
 use bevy::math::Affine2;
 use bevy::prelude::{
     AlphaMode, AssetServer, Assets, Color, Handle, Image, Res, ResMut, StandardMaterial,
 };
 use bevy::render::render_resource::Face;
-use bevy::render::texture::{
-    ImageAddressMode, ImageFilterMode, ImageLoaderSettings, ImageSampler, ImageSamplerDescriptor,
-};
 use bevy_granite_logging::{
     config::{LogCategory, LogLevel, LogType},
     log,
@@ -38,13 +38,13 @@ pub fn material_from_path_into_scene(
     asset_server: &Res<AssetServer>,
 ) -> Option<EditableMaterial> {
     if let Some(existing) = available_materials.find_material_by_path(path) {
-        log!(
-            LogType::Editor,
-            LogLevel::Info,
-            LogCategory::Asset,
-            "Reused existing material: {}",
-            existing.friendly_name
-        );
+        //log!(
+        //    LogType::Editor,
+        //    LogLevel::Info,
+        //    LogCategory::Asset,
+        //    "Reused existing material: {}",
+        //    existing.friendly_name
+        //);
         return Some(existing.clone());
     }
 
@@ -411,12 +411,10 @@ fn collect_material_files_recursive(current_dir: &str, ron_files: &mut Vec<Strin
 
 /// Loads a material from a path and returns it if it exists
 pub fn get_material_from_path(
-    path: &mut String,
+    path: &str,
     materials: &mut ResMut<Assets<StandardMaterial>>,
     available_materials: &mut ResMut<AvailableEditableMaterials>,
     asset_server: &Res<AssetServer>,
 ) -> Option<EditableMaterial> {
-    let material =
-        material_from_path_into_scene(&path, materials, available_materials, asset_server);
-    material
+    material_from_path_into_scene(path, materials, available_materials, asset_server)
 }

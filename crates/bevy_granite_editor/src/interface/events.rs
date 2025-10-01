@@ -5,15 +5,13 @@ use crate::interface::tabs::entity_editor::{
 use bevy::ecs::event::EventWriter;
 use bevy::ecs::system::SystemParam;
 use bevy::prelude::{Entity, Event, Vec2};
-use bevy_granite_core::{GraniteTypes, EditableMaterial};
-use bevy_granite_core::RequestDespawnSerializableEntities;
 use bevy_granite_core::RequestDespawnBySource;
+use bevy_granite_core::RequestDespawnSerializableEntities;
+use bevy_granite_core::{EditableMaterial, GraniteTypes};
 use bevy_granite_core::{RequestLoadEvent, RequestReloadEvent, RequestSaveEvent};
-use bevy_granite_gizmos::RequestDeselectAllEntitiesEvent;
 
 #[derive(SystemParam)]
 pub struct EditorEvents<'w> {
-    pub deselect: EventWriter<'w, RequestDeselectAllEntitiesEvent>,
     pub popup: EventWriter<'w, PopupMenuRequestedEvent>,
     pub save: EventWriter<'w, RequestSaveEvent>,
     pub reload: EventWriter<'w, RequestReloadEvent>,
@@ -27,6 +25,7 @@ pub struct EditorEvents<'w> {
     pub remove_children: EventWriter<'w, RequestRemoveChildren>,
     pub despawn_all: EventWriter<'w, RequestDespawnSerializableEntities>,
     pub despawn_by_source: EventWriter<'w, RequestDespawnBySource>,
+    pub set_active_world: EventWriter<'w, SetActiveWorld>,
 }
 
 // Internal Events
@@ -70,7 +69,7 @@ pub struct PopupMenuRequestedEvent {
 #[derive(Event)]
 pub struct MaterialHandleUpdateEvent {
     pub skip_entity: Entity, // Requestor
-    pub path: String, // Path of updated EditableMaterial
+    pub path: String,        // Path of updated EditableMaterial
     pub version: u32,
     pub material: EditableMaterial,
 }

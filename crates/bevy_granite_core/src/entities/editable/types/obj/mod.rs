@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use crate::{
     entities::editable::{
         GraniteType, RequestEntityUpdateFromClass, RequiredMaterialData, RequiredMaterialDataMut,
@@ -33,6 +35,7 @@ pub use update_event::*;
 pub struct UserUpdatedOBJEvent {
     pub entity: Entity,
     pub data: OBJ,
+    pub reload_mesh: bool,
 }
 
 /// Actual serialized class data thats stored inside IdentityData
@@ -40,14 +43,17 @@ pub struct UserUpdatedOBJEvent {
 /// OBJ needs materials, so we pass the required MaterialData which contains, path, current and last materials
 #[derive(Serialize, Deserialize, Reflect, Debug, Clone, PartialEq)]
 pub struct OBJ {
-    pub mesh_path: String,
+    pub mesh_path: Cow<'static, str>,
     pub material: MaterialData,
+    #[serde(skip)]
+    pub reload_requested: bool,
 }
 impl Default for OBJ {
     fn default() -> Self {
         Self {
-            mesh_path: "".to_string(),
+            mesh_path: "".into(),
             material: MaterialData::new("".to_string()),
+            reload_requested: false,
         }
     }
 }
@@ -70,8 +76,8 @@ impl GraniteType for OBJ {
         true
     }
 
-    fn get_prompt_config(&self) -> (String, Vec<String>) {
-        ("models".to_string(), vec!["obj".to_string()])
+    fn get_prompt_config(&self) -> (String, Vec<&'static str>) {
+        ("models".to_string(), vec!["obj"])
     }
 
     fn spawn_from_new_identity(

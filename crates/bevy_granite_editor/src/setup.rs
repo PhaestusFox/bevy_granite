@@ -21,7 +21,7 @@ $$ |  $$ |$$ |     $$  __$$ |$$ |  $$ |$$ |  $$ |$$\ $$   ____|
  \______/ \__|      \_______|\__|  \__|\__|   \____/  \_______|
 "#;
 
-    text += "\n\nBlake Darrow - 2024, 2025\nVersion: 0.1.0\n\n";
+    text += "\n\nBlake Darrow - 2024, 2025\nVersion: 0.2.0\n\n";
 
     log!(
         LogType::Editor,
@@ -33,7 +33,7 @@ $$ |  $$ |$$ |     $$  __$$ |$$ |  $$ |$$ |  $$ |$$\ $$   ____|
 }
 
 pub fn setup_ui_style(mut contexts: EguiContexts) {
-    let ctx = contexts.ctx_mut();
+    let ctx = contexts.ctx_mut().expect("Egui context is not available");
 
     let mut style = (*ctx.style()).clone();
 

@@ -1,9 +1,11 @@
 use bevy::{
     math::Vec2,
-    prelude::{Children, Commands, DespawnRecursiveExt, Entity, Query, Res},
+    prelude::{Children, Commands, Entity, Query, Res},
 };
-use bevy_granite_core::{RequestLoadEvent, RequestReloadEvent, RequestSaveEvent, UserInput};
-use bevy_granite_gizmos::{RequestDeselectAllEntitiesEvent, Selected};
+use bevy_granite_core::{
+    entities::SaveSettings, RequestLoadEvent, RequestReloadEvent, RequestSaveEvent, UserInput,
+};
+use bevy_granite_gizmos::{selection::events::EntityEvent, Selected};
 use bevy_granite_logging::{log, LogCategory, LogLevel, LogType};
 use native_dialog::FileDialog;
 
@@ -36,32 +38,32 @@ fn handle_shortcuts(
     query: &Query<(Entity, &Selected, Option<&Children>)>,
     events: &mut EditorEvents,
 ) {
-    // F1
+    // F2
     // Toggle editor on/off
-    if input.key_f1.just_pressed {
+    if input.key_f2.just_pressed {
         log!(
             LogType::Editor,
             LogLevel::Info,
             LogCategory::Input,
             "(shortcut) Toggling editor"
         );
-        events.toggle_editor.send(RequestEditorToggle);
+        events.toggle_editor.write(RequestEditorToggle);
     }
 
     if !editor_state.active {
         return;
     }
 
-    // F2
+    // F3
     // sync cam
-    if input.key_f2.just_pressed {
+    if input.key_f3.just_pressed {
         log!(
             LogType::Editor,
             LogLevel::Info,
             LogCategory::Input,
             "(shortcut) Toggling camera sync"
         );
-        events.toggle_cam_sync.send(RequestToggleCameraSync);
+        events.toggle_cam_sync.write(RequestToggleCameraSync);
     }
 
     // Delete Key
@@ -76,10 +78,10 @@ fn handle_shortcuts(
         for (entity, _, children) in query.iter() {
             if let Some(children) = children {
                 for &child in children.iter() {
-                    commands.entity(child).despawn_recursive();
+                    commands.entity(child).try_despawn();
                 }
             }
-            commands.entity(entity).despawn_recursive();
+            commands.entity(entity).try_despawn();
         }
     }
 
@@ -92,7 +94,7 @@ fn handle_shortcuts(
             LogCategory::Input,
             "(shortcut) Framing selected entity"
         );
-        events.frame.send(RequestCameraEntityFrame);
+        events.frame.write(RequestCameraEntityFrame);
     }
 
     // U key
@@ -104,7 +106,7 @@ fn handle_shortcuts(
             LogCategory::Input,
             "(shortcut) Deselecting all entities"
         );
-        events.deselect.send(RequestDeselectAllEntitiesEvent);
+        commands.trigger(EntityEvent::DeselectAll);
     }
 
     // Shft-A
@@ -120,22 +122,22 @@ fn handle_shortcuts(
             LogCategory::Input,
             "(shortcut) Opening Add Entity popup"
         );
-        events.popup.send(PopupMenuRequestedEvent {
+        events.popup.write(PopupMenuRequestedEvent {
             popup: PopupType::AddEntity,
             mouse_pos: input.mouse_pos,
         });
     }
 
-    // H
+    // F1
     // Help
-    if input.key_h.just_pressed && !input.mouse_over_egui && !input.mouse_right.any {
+    if input.key_f1.just_pressed && !input.mouse_over_egui && !input.mouse_right.any {
         log!(
             LogType::Editor,
             LogLevel::Info,
             LogCategory::Input,
             "(shortcut) Opening help popup"
         );
-        events.popup.send(PopupMenuRequestedEvent {
+        events.popup.write(PopupMenuRequestedEvent {
             popup: PopupType::Help,
             mouse_pos: Vec2::NAN,
         });
@@ -155,9 +157,11 @@ fn handle_shortcuts(
             .show_open_single_file()
             .unwrap()
         {
-            events
-                .load
-                .send(RequestLoadEvent(path.display().to_string()));
+            events.load.write(RequestLoadEvent(
+                path.display().to_string(),
+                SaveSettings::Runtime,
+                None,
+            ));
         };
     }
 
@@ -186,7 +190,7 @@ fn handle_shortcuts(
                     index + 1,
                     source
                 );
-                events.save.send(RequestSaveEvent(source.to_string()));
+                events.save.write(RequestSaveEvent(source.to_string()));
             }
         } else {
             log!(
@@ -198,10 +202,10 @@ fn handle_shortcuts(
         }
     }
 
-    // Fake undo for the time being
+    // Reload loaded worlds
     // Despawn entities and reload world
     if input.ctrl_left.pressed
-        && input.key_z.just_pressed
+        && input.key_r.just_pressed
         && !input.mouse_right.any
         && !input.mouse_left.any
     {
@@ -214,7 +218,7 @@ fn handle_shortcuts(
             );
             events
                 .reload
-                .send(RequestReloadEvent(current_file.to_string()));
+                .write(RequestReloadEvent(current_file.to_string()));
         } else {
             log!(
                 LogType::Editor,
@@ -238,7 +242,7 @@ fn handle_shortcuts(
             LogCategory::Input,
             "(shortcut) Opening Add Relationship popup"
         );
-        events.popup.send(PopupMenuRequestedEvent {
+        events.popup.write(PopupMenuRequestedEvent {
             popup: PopupType::AddRelationship,
             mouse_pos: input.mouse_pos,
         });

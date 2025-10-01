@@ -1,8 +1,8 @@
 use bevy::diagnostic::{DiagnosticsStore, FrameTimeDiagnosticsPlugin};
+use bevy::platform::collections::HashMap;
 use bevy::prelude::{Entity, Name, Query, Res, ResMut, With};
-use bevy::utils::HashMap;
-use bevy_granite_core::{AvailableEditableMaterials, IdentityData, SpawnSource};
-use bevy_granite_gizmos::{Selected, ActiveSelection};
+use bevy_granite_core::{AvailableEditableMaterials, IdentityData, SpawnSource, UserInput};
+use bevy_granite_gizmos::{ActiveSelection, Selected};
 
 use super::{ActiveObjectDetails, SelectionInfo};
 use crate::{
@@ -14,6 +14,7 @@ pub fn update_debug_tab_ui_system(
     selection_query: Query<Entity, With<Selected>>,
     active_selection_query: Query<Entity, With<ActiveSelection>>,
     available_materials: Res<AvailableEditableMaterials>,
+    user_input: Res<UserInput>,
     editor_state: Res<EditorState>,
     entity_query: Query<&Name>,
     identity_query: Query<&IdentityData>,
@@ -34,20 +35,20 @@ pub fn update_debug_tab_ui_system(
                 if let Some(active_entity) = active_selection_query.iter().next() {
                     let name = entity_query.get(active_entity).ok().map(|n| n.to_string());
                     let identity_data = identity_query.get(active_entity).ok().cloned();
-                    let spawned_from = spawn_source_query
-                        .get(active_entity)
-                        .ok()
-                        .map(|s| s.0.clone());
-                    
+                    let spawned_from = spawn_source_query.get(active_entity).ok();
+
                     ActiveObjectDetails {
                         entity: Some(active_entity),
                         name,
                         identity_data,
-                        spawned_from,
+                        spawned_from: spawned_from.cloned(),
                     }
                 } else {
                     ActiveObjectDetails::default()
                 };
+
+            let user_input = user_input.clone();
+            data.user_input = user_input;
 
             let selected_entities: Vec<Entity> = selection_query.iter().collect();
             let selection = if selected_entities.is_empty() {

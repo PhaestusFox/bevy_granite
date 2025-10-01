@@ -1,9 +1,9 @@
 use bevy::{
     app::PostStartup,
-    ecs::schedule::IntoSystemConfigs,
+    ecs::schedule::IntoScheduleConfigs,
     prelude::{App, Plugin, PreStartup},
 };
-use bevy_egui::EguiPlugin;
+use bevy_egui::{EguiGlobalSettings, EguiPlugin};
 use bevy_granite_logging::setup_logging;
 use bevy_obj::ObjPlugin;
 use setup::{gather_registered_types, setup_component_editor};
@@ -26,15 +26,26 @@ use crate::world::WorldPlugin;
 pub use assets::{
     get_material_from_path, load_texture_with_repeat, material_from_path_into_scene,
     materials_from_folder_into_scene, AvailableEditableMaterials, EditableMaterial,
-    EditableMaterialError, EditableMaterialField, MaterialData,
-    NewEditableMaterial, RequiredMaterialData, RequiredMaterialDataMut, StandardMaterialDef,
+    EditableMaterialError, EditableMaterialField, MaterialData, NewEditableMaterial,
+    RequiredMaterialData, RequiredMaterialDataMut, StandardMaterialDef,
 };
 pub use bevy_granite_macros::register_editor_components;
+
+// Marker trait for UI callable events
+pub trait UICallableEventMarker {}
+
+// Trait for providing event information to UI
+pub trait UICallableEventProvider {
+    fn get_struct_name() -> &'static str;
+    fn get_event_names() -> &'static [&'static str];
+}
+
 pub use entities::{
-    BridgeTag, Camera3D, ClassCategory, ComponentEditor, DirLight, GraniteEditorSerdeEntity,
-    GraniteType, GraniteTypes, HasRuntimeData, IdentityData, MainCamera, MaterialNameSource,
-    NeedsTangents, PointLightData, PromptData, PromptImportSettings, ReflectedComponent,
-    SpawnSource, TransformData, TreeHiddenEntity, UICamera, RectBrush, VolumetricFog, OBJ,
+    BridgeTag, Camera3D, ClassCategory, ComponentEditor, DirLight, EditorIgnore,
+    GraniteEditorSerdeEntity, GraniteType, GraniteTypes, HasRuntimeData, IdentityData, MainCamera,
+    MaterialNameSource, NeedsTangents, PointLightData, PromptData, PromptImportSettings, RectBrush,
+    ReflectedComponent, SaveSettings, SpawnSource, TransformData, TreeHiddenEntity, UICamera,
+    VolumetricFog, OBJ
 };
 pub use events::{
     CollectRuntimeDataEvent, RequestDespawnBySource, RequestDespawnSerializableEntities,
@@ -44,8 +55,8 @@ pub use events::{
 pub use setup::RegisteredTypeNames;
 pub use shared::{
     absolute_asset_to_rel, get_current_scene_version, get_minimum_scene_version,
-    is_scene_version_compatible, mouse_to_world_delta, CursorWindowPos, IconEntity, IconProxy,
-    IconType, InputTypes, UserInput,
+    is_scene_version_compatible, mouse_to_world_delta, rel_asset_to_absolute, CursorWindowPos,
+    IconEntity, IconProxy, IconType, InputTypes, UserInput,
 };
 
 // Bevy Granite Core plugin
@@ -61,7 +72,11 @@ impl Plugin for BevyGraniteCore {
             //
             // External
             .add_plugins(ObjPlugin)
-            .add_plugins(EguiPlugin) // for UserInput checking if we are over Egui. Ideally a better solution is available as this is the core crate that doest use UI
+            .insert_resource(EguiGlobalSettings {
+                auto_create_primary_context: false,
+                ..Default::default()
+            })
+            .add_plugins(EguiPlugin::default()) // for UserInput checking if we are over Egui. Ideally a better solution is available as this is the core crate that doest use UI
             // Internal
             .add_plugins(EntityPlugin)
             .add_plugins(WorldPlugin)

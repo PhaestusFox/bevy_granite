@@ -1,20 +1,19 @@
 use super::{RequestDuplicateAllSelectionEvent, RequestDuplicateEntityEvent};
-use crate::{gizmos::GizmoParent, selection::Selected};
+use crate::{
+    gizmos::{GizmoChildren},
+    selection::Selected,
+};
 use bevy::{
-    asset::{Assets, Handle},
+    asset::Assets,
     ecs::{
         entity::Entity,
         query::With,
         system::{Commands, Query},
     },
-    hierarchy::BuildWorldChildren,
-    prelude::{AppTypeRegistry, Children, EventReader, Parent, ReflectComponent, Res, World},
-    render::mesh::Mesh,
+    prelude::{AppTypeRegistry, ChildOf, Children, EventReader, ReflectComponent, Res, World},
+    render::mesh::{Mesh, Mesh3d},
 };
-use bevy_granite_core::{
-    entities::{GraniteType},
-    HasRuntimeData, IconProxy, IdentityData,
-};
+use bevy_granite_core::{entities::GraniteType, EditorIgnore, HasRuntimeData, IconProxy, IdentityData};
 use bevy_granite_logging::{
     config::{LogCategory, LogLevel, LogType},
     log,
@@ -36,11 +35,12 @@ pub fn duplicate_entity_system(
         let to_duplicate = event.entity;
         let registry = type_registry.clone();
 
-        commands.add(move |world: &mut World| {
+        commands.queue(move |world: &mut World| {
             let original_parent = world
                 .get_entity(to_duplicate)
-                .and_then(|entity_ref| entity_ref.get::<Parent>())
-                .map(|parent| parent.get());
+                .ok()
+                .and_then(|entity_ref| entity_ref.get::<ChildOf>())
+                .map(|parent| parent.parent());
 
             duplicate_entity_recursive(world, to_duplicate, original_parent, &registry);
         });
@@ -62,12 +62,13 @@ pub fn duplicate_all_selection_system(
         );
         let registry = type_registry.clone();
         let entities_to_duplicate: Vec<Entity> = selected.iter().collect();
-        commands.add(move |world: &mut World| {
+        commands.queue(move |world: &mut World| {
             for entity in entities_to_duplicate {
                 let original_parent = world
                     .get_entity(entity)
-                    .and_then(|entity_ref| entity_ref.get::<Parent>())
-                    .map(|parent| parent.get());
+                    .ok()
+                    .and_then(|entity_ref| entity_ref.get::<ChildOf>())
+                    .map(|parent| parent.parent());
 
                 duplicate_entity_recursive(world, entity, original_parent, &registry);
             }
@@ -92,15 +93,15 @@ fn duplicate_entity_recursive(
 
     if needs_unique {
         // Handle mesh cloning - for entities that need unique handles
-        if let Some(mesh_handle) = world.get::<Handle<Mesh>>(entity_to_duplicate).cloned() {
+        if let Some(mesh_handle) = world.get::<Mesh3d>(entity_to_duplicate).cloned() {
             if let Some(mut mesh_assets) = world.get_resource_mut::<Assets<Mesh>>() {
                 if let Some(original_mesh) = mesh_assets.get(&mesh_handle) {
                     let cloned_mesh = original_mesh.clone();
                     let new_handle = mesh_assets.add(cloned_mesh);
 
                     // Add the new handle to the new entity
-                    if let Some(mut entity_mut) = world.get_entity_mut(new_entity) {
-                        entity_mut.insert(new_handle);
+                    if let Ok(mut entity_mut) = world.get_entity_mut(new_entity) {
+                        entity_mut.insert(Mesh3d(new_handle));
                     }
                 }
             }
@@ -144,7 +145,7 @@ struct EntityInfo {
 }
 
 fn collect_entity_info(world: &World, entity: Entity) -> Option<EntityInfo> {
-    let entity_ref = world.get_entity(entity)?;
+    let entity_ref = world.get_entity(entity).ok()?;
 
     log!(
         LogType::Editor,
@@ -194,10 +195,14 @@ fn collect_entity_info(world: &World, entity: Entity) -> Option<EntityInfo> {
                 .filter(|&child| {
                     world
                         .get_entity(child)
-                        // Do NOT include GizmoParent or IconProxy in duplication
+                        // Do NOT include GizmoChildren, IconProxy, or any gizmo entities in duplication
                         .map(|entity_ref| {
-                            !entity_ref.contains::<GizmoParent>()
+                            !entity_ref.contains::<GizmoChildren>()
                                 && !entity_ref.contains::<IconProxy>()
+                                && !entity_ref
+                                    .get::<EditorIgnore>()
+                                    .map(|ignore| ignore.contains(EditorIgnore::GIZMO))
+                                    .unwrap_or(false)
                         })
                         .unwrap_or(false)
                 })
@@ -216,7 +221,7 @@ fn create_new_entity(world: &mut World, new_parent: Option<Entity>) -> Entity {
     let new_entity = entity_builder.insert(HasRuntimeData).id();
 
     if let Some(parent) = new_parent {
-        entity_builder.set_parent(parent);
+        entity_builder.insert(ChildOf(parent));
     }
 
     new_entity
@@ -237,15 +242,20 @@ fn copy_components_safe(
         .unwrap_or(false);
 
     let mut skip_components = vec![
-        std::any::TypeId::of::<Parent>(),
+        std::any::TypeId::of::<ChildOf>(),
         std::any::TypeId::of::<Children>(),
     ];
 
     // Things like rectangle brushes need unique handles, as we directly edit the vert data in editor
     if needs_unique {
-        skip_components.push(std::any::TypeId::of::<Handle<Mesh>>());
+        log!(
+            LogType::Editor,
+            LogLevel::Info,
+            LogCategory::Entity,
+            "Requesting unique handle"
+        );
+        skip_components.push(std::any::TypeId::of::<Mesh3d>());
     }
-
 
     for &type_id in component_type_ids {
         if skip_components.contains(&type_id) {
@@ -281,13 +291,14 @@ fn copy_components_safe(
         };
 
         let source_ref = match world.get_entity(source_entity) {
-            Some(er) => er,
-            None => {
+            Ok(er) => er,
+            Err(e) => {
                 log!(
                     LogType::Editor,
                     LogLevel::Warning,
                     LogCategory::Entity,
-                    "Source entity {:?} does not exist, skipping component {:?}.",
+                    "Error: {:?} Source entity {:?} does not exist, skipping component {:?}.",
+                    e,
                     source_entity,
                     type_id
                 );
@@ -309,23 +320,21 @@ fn copy_components_safe(
             }
         };
 
-        let cloned_component = reflected_component.clone_value();
-
         // Special handling for IdentityData to generate a new UUID
         if type_id == std::any::TypeId::of::<IdentityData>() {
-            // Get source identity data first
             if let Some(source_identity) = world.get::<IdentityData>(source_entity) {
                 let mut new_identity = source_identity.clone();
                 new_identity.uuid = Uuid::new_v4(); // Generate new UUID for the duplicate
-                
-                // Now insert the new identity data
-                if let Some(mut target_ref) = world.get_entity_mut(target_entity) {
+
+                if let Ok(mut target_ref) = world.get_entity_mut(target_entity) {
                     target_ref.insert(new_identity);
                 }
             }
         } else {
-            if let Some(mut target_ref) = world.get_entity_mut(target_entity) {
-                reflect_component.insert(&mut target_ref, &*cloned_component, &registry_guard);
+            if let Ok(cloned_component) = reflected_component.reflect_clone() {
+                if let Ok(mut target_ref) = world.get_entity_mut(target_entity) {
+                    reflect_component.insert(&mut target_ref, &*cloned_component, &registry_guard);
+                }
             }
         }
     }
@@ -333,7 +342,7 @@ fn copy_components_safe(
 
 fn log_copied_components(world: &World, entity: Entity) {
     let mut component_names = Vec::new();
-    if let Some(entity_ref) = world.get_entity(entity) {
+    if let Ok(entity_ref) = world.get_entity(entity) {
         for archetype_component_id in entity_ref.archetype().components() {
             if let Some(component_info) = world.components().get_info(archetype_component_id) {
                 component_names.push(component_info.name());

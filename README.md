@@ -115,12 +115,11 @@ While comprehensive documentation is currently unavailable, here are some helpfu
 
 ### Custom UI Callable Events
 
-With version 0.2.x, there is a new window that renders users buttons that are clickable. Create a struct that holds your events, and add `#[ui_callable_events]`. This will add all the events to the events window as clickable, and will dispatch said event in your struct.
-
-
-> [!IMPORTANT] 
 > Only Bevy Event unit structs are supported for UI button rendering.
 
+With version 0.2.x, there is a new window that renders users buttons that are clickable. Create a struct that holds your events, and add `#[ui_callable_events]`. This will add all the events to the events window as clickable, and will dispatch said event in your struct.
+
+Make sure to call  UI registration before the plugin gets initialized in your app if your using this. `DebugEvents::register_ui();`.
 
 <details>
 <summary>Example</summary>
@@ -133,7 +132,7 @@ pub struct DebugRequestPlayer;
 #[derive(Event, Default)]
 pub struct DebugRequestRemovePlayer;
 
-#[ui_callable_events] # <- HERE
+#[ui_callable_events] 
 pub struct DebugEvents {
     pub spawn_player: DebugRequestPlayer,
     pub remove_player: DebugRequestRemovePlayer,
@@ -161,7 +160,6 @@ pub fn debug_callable_watcher(
 </details>
 
 
-Make sure to call  UI registration before the plugin gets initialized in your app if your using this. `DebugEvents::register_ui();`.
 
 ---
 

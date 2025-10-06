@@ -26,14 +26,14 @@ use crate::{
 };
 use bevy::{
     app::{PostUpdate, Startup},
-    ecs::schedule::{common_conditions::not, ApplyDeferred, IntoScheduleConfigs},
+    camera::visibility::RenderLayers,
+    ecs::schedule::{common_conditions::not, ApplyDeferred, IntoScheduleConfigs}, // from #78
     gizmos::{
         config::{DefaultGizmoConfigGroup, GizmoConfig},
         AppGizmoBuilder,
     },
     prelude::{App, Plugin, Update},
-    render::view::RenderLayers,
-    transform::TransformSystem,
+    transform::TransformSystems,
 };
 
 pub struct ViewportPlugin;
@@ -120,7 +120,7 @@ impl Plugin for ViewportPlugin {
                     show_active_selection_bounds_system,
                     show_selected_entities_bounds_system,
                 )
-                    .after(TransformSystem::TransformPropagate)
+                    .after(TransformSystems::Propagate)
                     .run_if(is_editor_active),
             )
             .add_systems(PostUpdate, sync_cameras_system.run_if(is_editor_active));

@@ -25,7 +25,7 @@ use bevy_granite_core::{
     absolute_asset_to_rel, entities::SaveSettings, RequestDespawnBySource,
     RequestDespawnSerializableEntities, RequestLoadEvent, RequestSaveEvent, UserInput,
 };
-use bevy_granite_gizmos::selection::events::EntityEvent;
+use bevy_granite_gizmos::selection::events::EntityEvents;
 use native_dialog::FileDialog;
 
 pub fn top_bar_ui(
@@ -336,7 +336,7 @@ pub fn top_bar_ui(
             }
             ui.separator();
             if ui.button("Deselect All (U) ").clicked() {
-                commands.trigger(EntityEvent::DeselectAll);
+                commands.trigger(EntityEvents::DeselectAll);
             }
             ui.separator();
         });

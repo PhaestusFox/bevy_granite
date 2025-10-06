@@ -13,9 +13,15 @@ use crate::{
 };
 
 use bevy::{
+    camera::Camera,
+    ecs::{
+        query::With,
+        system::{Commands, Query, Single},
+    },
+    prelude::{Res, ResMut},
     core_pipeline::core_3d::Camera3d,
     ecs::system::Commands,
-    prelude::{Camera, Entity, Name, Query, Res, ResMut, With, Without},
+    prelude::{Entity, Name, Res, ResMut, With, Without},
     render::camera::RenderTarget,
 };
 use bevy_egui::{egui, EguiContexts};
@@ -57,10 +63,11 @@ pub fn dock_ui_system(
     editor_state: Res<EditorState>,
     user_input: Res<UserInput>,
     mut commands: Commands,
+    mut view_port: Query<&mut Camera, With<crate::ViewPortCamera>>,
     camera_query: Query<
         (Entity, Option<&Name>, &Camera),
         (With<Camera3d>, Without<UICamera>, Without<EditorViewportCamera>),
-    >,
+    >, // some changes from #78
     viewport_camera_state: Res<ViewportCameraState>,
 ) {
     let mut camera_options: Vec<(Entity, String)> = camera_query
@@ -84,7 +91,7 @@ pub fn dock_ui_system(
     let bottom_panel_height = (screen_height * 0.05).clamp(100., 400.);
 
     let space = get_interface_config_float("ui.spacing");
-
+    let mut left = false;
     egui::TopBottomPanel::top("tool_panel")
         .resizable(false)
         .show(ctx, |ui| {
@@ -106,6 +113,7 @@ pub fn dock_ui_system(
     let side_panel_position = editor_state.config.dock.side_panel_position;
     match side_panel_position {
         SidePanelPosition::Left => {
+            left = true;
             egui::SidePanel::left("left_dock_panel")
                 .resizable(true)
                 .default_width(right_panel_width)
@@ -139,4 +147,20 @@ pub fn dock_ui_system(
                 .id(egui::Id::new("bottom_dock_area"))
                 .show_inside(ui, &mut BottomTabViewer);
         });
+
+    let size = ctx.available_rect();
+    for mut camera in view_port.iter_mut() {
+        let width = (size.width() * 1.5) as u32;
+        let height = (size.height() * 1.5) as u32;
+        let Some(viewport) = camera.viewport.as_mut() else {
+            continue;
+        };
+        if left {
+            viewport.physical_position.x = screen_width as u32 - width;
+        } else {
+            viewport.physical_position.x = 0;
+        }
+        viewport.physical_position.y = (size.min.y * 1.5) as u32;
+        viewport.physical_size = bevy::prelude::UVec2::new(width, height);
+    }
 }

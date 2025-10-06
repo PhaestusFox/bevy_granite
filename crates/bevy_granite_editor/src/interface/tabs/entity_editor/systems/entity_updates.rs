@@ -20,13 +20,13 @@ use bevy::{
 use bevy::{
     asset::Assets,
     ecs::{
-        event::{EventReader, EventWriter},
+        message::{MessageReader, MessageWriter},
         query::Without,
         system::{Query, Res, ResMut},
     },
 };
 use bevy_granite_core::{
-    entities::{editable::RequestEntityUpdateFromClass, GraniteType},
+    entities::{editable::RequestEntityUpdateFromClass, GraniteType, Unknown},
     AvailableEditableMaterials, ComponentEditor, EditableMaterial, EditableMaterialError,
     EditableMaterialField, IdentityData, StandardMaterialDef,
 };
@@ -49,7 +49,7 @@ use bevy_granite_logging::{
 // Request to change the entity transform, update the entity transform, and inverse the gizmo rotation
 // so it doesn't move with the new rotation
 pub fn update_entity_with_new_transform_system(
-    mut transform_updated_reader: EventReader<UserUpdatedTransformEvent>,
+    mut transform_updated_reader: MessageReader<UserUpdatedTransformEvent>,
     mut e_query: Query<
         (Entity, &mut Transform, &GlobalTransform, Option<&ChildOf>),
         (Without<GizmoChildren>, With<IdentityData>),
@@ -105,8 +105,8 @@ pub fn update_entity_with_new_transform_system(
 
 pub fn update_entity_with_new_identity_system(
     mut commands: Commands,
-    mut identity_updated_reader: EventReader<UserUpdatedIdentityEvent>,
-    mut material_handle_update_writer: EventWriter<MaterialHandleUpdateEvent>,
+    mut identity_updated_reader: MessageReader<UserUpdatedIdentityEvent>,
+    mut material_handle_update_writer: MessageWriter<MaterialHandleUpdateEvent>,
     mut request_writer: RequestEntityUpdateFromClass,
     mut query: Query<EntityCacheQueryItem>,
     mut materials: ResMut<Assets<StandardMaterial>>,
@@ -120,10 +120,10 @@ pub fn update_entity_with_new_identity_system(
     {
         for (
             entity,
-            mut name,
+            name,
             _transform,
             _global_transform,
-            mut identity_data,
+            identity_data_ref,
             mut material_handle,
             _active,
         ) in query.iter_mut()
@@ -137,6 +137,18 @@ pub fn update_entity_with_new_identity_system(
                 );
                 continue;
             }
+
+            let mut identity_data = if let Some(data) = identity_data_ref.as_ref() {
+                data.as_ref().clone()
+            } else {
+                IdentityData {
+                    class: bevy_granite_core::GraniteTypes::Unknown(Unknown::default()),
+                    uuid: uuid::Uuid::new_v4(),
+                    name: name
+                        .map(|n| n.to_string())
+                        .unwrap_or(format!("Entity {:?}", entity)),
+                }
+            };
 
             // Only update materials when there are actual changes, not any change
             let needs_mat_update =
@@ -159,7 +171,9 @@ pub fn update_entity_with_new_identity_system(
 
             if needs_entity_name_update {
                 identity_data.name = update_data.name.clone();
-                *name = Name::new(update_data.name.clone());
+                commands
+                    .entity(entity)
+                    .insert(Name::new(update_data.name.clone()));
 
                 log!(
                     LogType::Editor,
@@ -227,6 +241,10 @@ pub fn update_entity_with_new_identity_system(
                     );
                 }
             }
+
+            if let Some(mut data) = identity_data_ref {
+                *data = identity_data;
+            }
         }
     }
 }
@@ -243,7 +261,7 @@ fn handle_material_update(
     materials: &mut ResMut<Assets<StandardMaterial>>,
     available_obj_materials: &mut ResMut<AvailableEditableMaterials>,
     asset_server: &Res<AssetServer>,
-    material_handle_update_writer: &mut EventWriter<MaterialHandleUpdateEvent>,
+    material_handle_update_writer: &mut MessageWriter<MaterialHandleUpdateEvent>,
 ) {
     if !material.disk_changes && !needs_mat_update {
         log!(
@@ -410,7 +428,7 @@ fn handle_material_update(
 }
 
 pub fn update_entity_with_new_components_system(
-    mut components_updated_reader: EventReader<UserUpdatedComponentsEvent>,
+    mut components_updated_reader: MessageReader<UserUpdatedComponentsEvent>,
     mut commands: Commands,
 ) {
     for UserUpdatedComponentsEvent { entity, data } in components_updated_reader.read() {
@@ -471,7 +489,7 @@ fn handle_component_update(
 }
 
 pub fn handle_material_deletion_system(
-    mut material_delete_reader: EventReader<MaterialDeleteEvent>,
+    mut material_delete_reader: MessageReader<MaterialDeleteEvent>,
     available_materials: Res<AvailableEditableMaterials>,
     mut identity_query: Query<(Entity, &mut IdentityData)>,
     mut commands: Commands,

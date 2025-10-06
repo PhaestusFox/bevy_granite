@@ -1,16 +1,18 @@
+
+use bevy::camera::visibility::RenderLayers;
+use bevy::camera::Viewport;
 use crate::{
     editor_state::INPUT_CONFIG,
     viewport::camera::{CameraTarget, EditorViewportCamera, ViewportCameraState},
-};
+}; // from #78
 use bevy::{core_pipeline::tonemapping::Tonemapping, picking::Pickable};
 use bevy::{
-    core_pipeline::core_3d::Camera3d,
+    camera::Camera3d,
     input::mouse::{MouseMotion, MouseWheel},
     prelude::{
-        Camera, Commands, EulerRot, EventReader, Local, Name, Quat, Query, Res, ResMut, Time,
+        Camera, Commands, EulerRot, Local, MessageReader, Name, Quat, Query, Res, ResMut, Time,
         Transform, Vec2, Vec3, With,
     },
-    render::view::RenderLayers,
 };
 use bevy_granite_core::{EditorIgnore, TreeHiddenEntity, UICamera, UserInput};
 
@@ -69,6 +71,20 @@ pub fn add_ui_camera(mut commands: Commands) {
         .insert(TreeHiddenEntity)
         .insert(bevy_granite_gizmos::GizmoCamera)
         .insert(RenderLayers::layer(14)) // 14 is our UI/Gizmo layer.
+        .with_child((
+            Camera3d::default(),
+            crate::ViewPortCamera,
+            Tonemapping::None,
+            Camera {
+                order: 3,
+                viewport: Some(Viewport {
+                    physical_position: (0, 0).into(),
+                    physical_size: (400, 400).into(),
+                    ..Default::default()
+                }),
+                ..Default::default()
+            },
+        ))
         .id();
 }
 
@@ -89,8 +105,8 @@ pub fn rotate_camera_towards(
 pub fn handle_movement(
     query: &mut Query<&mut Transform, With<UICamera>>,
     user_input: &Res<UserInput>,
-    mouse_motion_events: &mut EventReader<MouseMotion>,
-    mouse_wheel_events: &mut EventReader<MouseWheel>,
+    mouse_motion_events: &mut MessageReader<MouseMotion>,
+    mouse_wheel_events: &mut MessageReader<MouseWheel>,
     _target_pos: &mut ResMut<CameraTarget>,
     time: Res<Time>,
     mut movement_speed: Local<f32>,
@@ -155,7 +171,7 @@ pub fn handle_movement(
 
 pub fn handle_zoom(
     query: &mut Query<&mut Transform, With<UICamera>>,
-    mouse_wheel_events: &mut EventReader<MouseWheel>,
+    mouse_wheel_events: &mut MessageReader<MouseWheel>,
     target_pos: &mut ResMut<CameraTarget>,
 ) {
     let zoom_speed = INPUT_CONFIG.zoom_camera_sensitivity;

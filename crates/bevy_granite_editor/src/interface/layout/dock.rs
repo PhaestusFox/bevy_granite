@@ -95,7 +95,9 @@ pub fn dock_ui_system(
     let screen_width = screen_rect.width();
     let screen_height = screen_rect.height();
 
-    let right_panel_width = (screen_width * 0.10).clamp(200., 1000.);
+    let default_side_panel_width = (screen_width * 0.10).clamp(200., 1000.);
+    // we need a way to calculate the minimum size the bottom panel can be so if we change it in the future it wont start crashing again
+    let max_side_panel_width = screen_width - 270.; // 270 is the minimum size to fit bottom panel it will crash is smaller than this
     let bottom_panel_height = (screen_height * 0.05).clamp(100., 400.);
 
     let space = get_interface_config_float("ui.spacing");
@@ -122,8 +124,8 @@ pub fn dock_ui_system(
         SidePanelPosition::Left => {
             egui::SidePanel::left("left_dock_panel")
                 .resizable(true)
-                .default_width(right_panel_width)
-                .width_range(250.0..=(screen_width * 0.9))
+                .default_width(default_side_panel_width)
+                .width_range(250.0..=max_side_panel_width)
                 .show(ctx, |ui| {
                     DockArea::new(&mut side_dock.dock_state)
                         .id(egui::Id::new("left_dock_area"))
@@ -133,8 +135,8 @@ pub fn dock_ui_system(
         SidePanelPosition::Right => {
             egui::SidePanel::right("right_dock_panel")
                 .resizable(true)
-                .default_width(right_panel_width)
-                .width_range(250.0..=(screen_width * 0.9))
+                .default_width(default_side_panel_width)
+                .width_range(250.0..=max_side_panel_width)
                 .show(ctx, |ui| {
                     DockArea::new(&mut side_dock.dock_state)
                         .id(egui::Id::new("right_dock_area"))
@@ -153,4 +155,22 @@ pub fn dock_ui_system(
                 .id(egui::Id::new("bottom_dock_area"))
                 .show_inside(ui, &mut BottomTabViewer);
         });
+
+    let size = ctx.available_rect();
+    for (_, _, mut camera, _, _, _, viewportcamera) in camera_query.iter_mut() {
+        if viewportcamera.is_some() {
+            let width = (size.width() * ctx.pixels_per_point()) as u32;
+            let height = (size.height() * ctx.pixels_per_point()) as u32;
+            let Some(viewport) = camera.viewport.as_mut() else {
+                continue;
+            };
+            if left {
+                viewport.physical_position.x = screen_width as u32 - width;
+            } else {
+                viewport.physical_position.x = 0;
+            }
+            viewport.physical_position.y = (size.min.y * ctx.pixels_per_point()) as u32;
+            viewport.physical_size = bevy::prelude::UVec2::new(width, height);
+        }
+    }
 }

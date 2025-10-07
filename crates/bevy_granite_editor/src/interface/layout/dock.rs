@@ -155,22 +155,4 @@ pub fn dock_ui_system(
                 .id(egui::Id::new("bottom_dock_area"))
                 .show_inside(ui, &mut BottomTabViewer);
         });
-
-    let size = ctx.available_rect();
-    for (_, _, mut camera, _, _, _, viewportcamera) in camera_query.iter_mut() {
-        if viewportcamera.is_some() {
-            let width = (size.width() * ctx.pixels_per_point()) as u32;
-            let height = (size.height() * ctx.pixels_per_point()) as u32;
-            let Some(viewport) = camera.viewport.as_mut() else {
-                continue;
-            };
-            if left {
-                viewport.physical_position.x = screen_width as u32 - width;
-            } else {
-                viewport.physical_position.x = 0;
-            }
-            viewport.physical_position.y = (size.min.y * ctx.pixels_per_point()) as u32;
-            viewport.physical_size = bevy::prelude::UVec2::new(width, height);
-        }
-    }
 }

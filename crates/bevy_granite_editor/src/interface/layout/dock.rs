@@ -149,8 +149,8 @@ pub fn dock_ui_system(
     let size = ctx.available_rect();
     for (_, _, mut camera, _, _, _, viewportcamera) in camera_query.iter_mut() {
         if viewportcamera.is_some() {
-            let width = (size.width() * 1.5) as u32;
-            let height = (size.height() * 1.5) as u32;
+            let width = (size.width() * ctx.pixels_per_point()) as u32;
+            let height = (size.height() * ctx.pixels_per_point()) as u32;
             let Some(viewport) = camera.viewport.as_mut() else {
                 continue;
             };
@@ -159,7 +159,7 @@ pub fn dock_ui_system(
             } else {
                 viewport.physical_position.x = 0;
             }
-            viewport.physical_position.y = (size.min.y * 1.5) as u32;
+            viewport.physical_position.y = (size.min.y * ctx.pixels_per_point()) as u32;
             viewport.physical_size = bevy::prelude::UVec2::new(width, height);
         }
     }

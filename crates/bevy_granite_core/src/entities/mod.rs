@@ -174,7 +174,7 @@ impl Default for PromptData {
 pub use component_editor::{
     is_bridge_component_check, BridgeTag, ComponentEditor, ExposedToEditor, ReflectedComponent,
 };
-pub use deserialize::{deserialize_entities, GraniteEditorSerdeEntity};
+pub use deserialize::{deserialize_scene_v0_1_4, GraniteEditorSerdeEntity};
 pub use editable::{
     Camera3D, DirLight, Empty, GraniteTypes, PointLightData, RectBrush, VolumetricFog, OBJ,
 };

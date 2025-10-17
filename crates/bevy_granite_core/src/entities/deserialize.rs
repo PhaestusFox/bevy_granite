@@ -31,7 +31,7 @@ pub struct GraniteEditorSerdeEntity;
 // Insert all components with access to mut World after all entities are spawned
 
 /// Build materials and entities into the scene from the world path
-pub fn deserialize_entities(
+pub fn deserialize_scene_v0_1_4(
     asset_server: &Res<AssetServer>,
     commands: &mut Commands,
     materials: &mut ResMut<Assets<StandardMaterial>>,

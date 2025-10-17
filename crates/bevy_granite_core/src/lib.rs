@@ -54,9 +54,8 @@ pub use events::{
 };
 pub use setup::RegisteredTypeNames;
 pub use shared::{
-    absolute_asset_to_rel, get_current_scene_version, get_minimum_scene_version,
-    is_scene_version_compatible, mouse_to_world_delta, rel_asset_to_absolute, CursorWindowPos,
-    IconEntity, IconProxy, IconType, InputTypes, UserInput,
+    absolute_asset_to_rel, is_scene_version_compatible, mouse_to_world_delta,
+    rel_asset_to_absolute, CursorWindowPos, IconEntity, IconProxy, IconType, InputTypes, UserInput,
 };
 
 // Bevy Granite Core plugin

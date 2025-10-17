@@ -1,8 +1,6 @@
-use std::cmp::Ordering;
-use serde::{Deserialize};
-use bevy_granite_logging::{log, LogType, LogLevel, LogCategory};
-
-pub const VERSIONS_TOML: &str = include_str!("../../config/versions.toml");
+use bevy_granite_logging::{log, LogCategory, LogLevel, LogType};
+use serde::{Deserialize, Serialize};
+use std::{cmp::Ordering, ops::Deref, str::FromStr};
 
 #[derive(Deserialize, Debug)]
 struct FileVersionConfig {
@@ -11,77 +9,129 @@ struct FileVersionConfig {
 
 #[derive(Deserialize, Debug)]
 struct SceneFormatConfig {
-    current_version: String,
-    minimum_supported_version: String,
+    current_version: Versions,
+    minimum_supported_version: Versions,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
-struct Version {
-    major: u32,
-    minor: u32,
-    patch: u32,
-    pre_release: Option<String>,
-    build: Option<String>,
+#[derive(Debug, Clone, PartialEq, Eq, Copy)]
+pub enum Versions {
+    V0_1_4,
+    V0_1_5,
 }
 
-impl Version {
-    fn parse(version_str: &str) -> Result<Self, String> {
-        let parts: Vec<&str> = version_str.split('+').collect();
-        let (version_part, build) = match parts.len() {
-            1 => (parts[0], None),
-            2 => (parts[0], Some(parts[1].to_string())),
-            _ => return Err("Invalid version format: too many '+' separators".to_string()),
-        };
+impl Versions {
+    pub const CURRENT_VERSION: Versions = Versions::V0_1_4;
+    pub const MINIMUM_SUPPORTED_VERSION: Versions = Versions::V0_1_4;
+    pub const PRE_RELEASE_VERSION: Versions = Versions::V0_1_5;
+}
 
-        let parts: Vec<&str> = version_part.split('-').collect();
-        let (core_version, pre_release) = match parts.len() {
-            1 => (parts[0], None),
-            _ => {
-                let pre = parts[1..].join("-");
-                (parts[0], if pre.is_empty() { None } else { Some(pre) })
-            }
-        };
+impl<'de> Deserialize<'de> for Versions {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Versions::from_str(&s).map_err(serde::de::Error::custom)
+    }
+}
 
-        let version_numbers: Vec<&str> = core_version.split('.').collect();
-        if version_numbers.len() != 3 {
-            return Err("Version must have exactly 3 numbers (major.minor.patch)".to_string());
+impl std::fmt::Display for Versions {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.as_str())
+    }
+}
+
+impl Versions {
+    pub fn major(&self) -> u32 {
+        match self {
+            Versions::V0_1_4 => 0,
+            Versions::V0_1_5 => 0,
         }
-
-        let major = version_numbers[0].parse::<u32>()
-            .map_err(|_| "Invalid major version number")?;
-        let minor = version_numbers[1].parse::<u32>()
-            .map_err(|_| "Invalid minor version number")?;
-        let patch = version_numbers[2].parse::<u32>()
-            .map_err(|_| "Invalid patch version number")?;
-
-        Ok(Version {
-            major,
-            minor,
-            patch,
-            pre_release,
-            build,
-        })
     }
 
-    fn is_pre_release(&self) -> bool {
-        self.pre_release.is_some()
+    pub fn minor(&self) -> u32 {
+        match self {
+            Versions::V0_1_4 => 1,
+            Versions::V0_1_5 => 1,
+        }
     }
 
+    pub fn patch(&self) -> u32 {
+        match self {
+            Versions::V0_1_4 => 4,
+            Versions::V0_1_5 => 5,
+        }
+    }
+
+    pub fn suffix(&self) -> Option<&String> {
+        None
+    }
+
+    pub fn is_pre_release(&self) -> bool {
+        matches!(self, Versions::V0_1_5)
+    }
+
+    pub fn as_str(&self) -> &'static str {
+        match self {
+            Versions::V0_1_4 => "0.1.4",
+            Versions::V0_1_5 => "0.1.5",
+        }
+    }
 }
 
-impl PartialOrd for Version {
+impl FromStr for Versions {
+    type Err = VersionError;
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "0.1.4" => Ok(Versions::V0_1_4),
+            "0.1.5" => Ok(Versions::V0_1_5),
+            _ => Err(VersionError::InvalidVersion(s.to_string())),
+        }
+    }
+}
+
+#[derive(Debug)]
+pub enum VersionError {
+    InvalidVersion(String),
+}
+
+impl std::fmt::Display for VersionError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            VersionError::InvalidVersion(v) => write!(f, "Invalid version string: {v}"),
+        }
+    }
+}
+
+impl std::error::Error for VersionError {}
+
+impl Serialize for Versions {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(self.as_str())
+    }
+}
+
+impl PartialOrd for Versions {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for Version {
+impl Ord for Versions {
     fn cmp(&self, other: &Self) -> Ordering {
         // Compare major.minor.patch first
-        match (self.major.cmp(&other.major), self.minor.cmp(&other.minor), self.patch.cmp(&other.patch)) {
+        match (
+            self.major().cmp(&other.major()),
+            self.minor().cmp(&other.minor()),
+            self.patch().cmp(&other.patch()),
+        ) {
             (Ordering::Equal, Ordering::Equal, Ordering::Equal) => {
                 // Core versions are equal, now compare pre-release
-                match (&self.pre_release, &other.pre_release) {
+                match (&self.suffix(), &other.suffix()) {
                     (None, None) => Ordering::Equal,
                     (None, Some(_)) => Ordering::Greater, // Stable > pre-release
                     (Some(_), None) => Ordering::Less,    // Pre-release < stable
@@ -100,55 +150,9 @@ impl Ord for Version {
 }
 
 /// Check if the given version is compatible with the current format
-pub fn is_scene_version_compatible(version: &str) -> bool {
-    let current_version_str = get_current_scene_version();
-    let min_version_str = get_minimum_scene_version();
-
-    // Parse versions
-    let version = match Version::parse(version) {
-        Ok(v) => v,
-        Err(e) => {
-            log!(
-                LogType::Game,
-                LogLevel::Error,
-                LogCategory::System,
-                "Failed to parse version '{}': {}",
-                version,
-                e
-            );
-            return false;
-        }
-    };
-
-    let current_version = match Version::parse(&current_version_str) {
-        Ok(v) => v,
-        Err(e) => {
-            log!(
-                LogType::Game,
-                LogLevel::Error,
-                LogCategory::System,
-                "Failed to parse current version '{}': {}",
-                current_version_str,
-                e
-            );
-            return false;
-        }
-    };
-
-    let min_version = match Version::parse(&min_version_str) {
-        Ok(v) => v,
-        Err(e) => {
-            log!(
-                LogType::Game,
-                LogLevel::Error,
-                LogCategory::System,
-                "Failed to parse minimum version '{}': {}",
-                min_version_str,
-                e
-            );
-            return false;
-        }
-    };
+pub fn is_scene_version_compatible(version: Versions) -> bool {
+    let current_version = Versions::CURRENT_VERSION;
+    let min_version = Versions::MINIMUM_SUPPORTED_VERSION;
 
     // Check if version matches current exactly
     if version == current_version {
@@ -157,7 +161,7 @@ pub fn is_scene_version_compatible(version: &str) -> bool {
             LogLevel::Info,
             LogCategory::System,
             "Version '{}' matches current version exactly",
-            version.to_string()
+            version
         );
         return true;
     }
@@ -165,20 +169,28 @@ pub fn is_scene_version_compatible(version: &str) -> bool {
     // Check if version is at least the minimum supported
     if version >= min_version {
         if version < current_version {
-            let version_type = if version.is_pre_release() { "pre-release" } else { "stable" };
+            let version_type = if version.is_pre_release() {
+                "pre-release"
+            } else {
+                "stable"
+            };
             log!(
                 LogType::Game,
                 LogLevel::Info,
                 LogCategory::System,
                 "Loading older compatible {} version '{}' (current: '{}', min supported: '{}')",
                 version_type,
-                version.to_string(),
-                current_version.to_string(),
-                min_version.to_string()
+                version,
+                current_version,
+                min_version
             );
         } else {
             // version > current_version
-            let version_type = if version.is_pre_release() { "pre-release" } else { "stable" };
+            let version_type = if version.is_pre_release() {
+                "pre-release"
+            } else {
+                "stable"
+            };
             log!(
                 LogType::Game,
                 LogLevel::Warning,
@@ -193,47 +205,33 @@ pub fn is_scene_version_compatible(version: &str) -> bool {
     }
 
     // Version is below minimum supported
-    let version_type = if version.is_pre_release() { "pre-release" } else { "stable" };
+    let version_type = if version.is_pre_release() {
+        "pre-release"
+    } else {
+        "stable"
+    };
     log!(
         LogType::Game,
         LogLevel::Error,
         LogCategory::System,
         "Version '{}' ({}) is below minimum supported version '{}'. Current version is '{}'.",
-        version.to_string(),
+        version,
         version_type,
-        min_version.to_string(),
-        current_version.to_string()
+        min_version,
+        current_version
     );
     false
 }
 
-// For Scene Metadata
-pub fn get_current_scene_version() -> String {
-    match toml::from_str::<FileVersionConfig>(VERSIONS_TOML) {
-        Ok(config) => config.scene_format.current_version,
-        Err(_) => "1.0.0".to_string()
-    }
-}
-
-// For Scene Metadata
-pub fn get_minimum_scene_version() -> String {
-    match toml::from_str::<FileVersionConfig>(VERSIONS_TOML) {
-        Ok(min) => min.scene_format.minimum_supported_version,
-        Err(_) => "1.0.0".to_string()
-    }
-}
-
-
-impl std::fmt::Display for Version {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}.{}.{}", self.major, self.minor, self.patch)?;
-        if let Some(ref pre_release) = self.pre_release {
-            write!(f, "-{}", pre_release)?;
-        }
-        if let Some(ref build) = self.build {
-            write!(f, "+{}", build)?;
-        }
-        Ok(())
-    }
-}
-
+// impl std::fmt::Display for Version {
+//     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+//         write!(f, "{}.{}.{}", self.major, self.minor, self.patch)?;
+//         if let Some(ref pre_release) = self.pre_release {
+//             write!(f, "-{}", pre_release)?;
+//         }
+//         if let Some(ref build) = self.build {
+//             write!(f, "+{}", build)?;
+//         }
+//         Ok(())
+//     }
+// }

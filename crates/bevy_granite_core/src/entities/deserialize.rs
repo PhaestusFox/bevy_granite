@@ -264,7 +264,7 @@ fn gather_file_contents(
         );
 
         // Check version compatibility
-        if !is_scene_version_compatible(&scene_data.metadata.format_version) {
+        if !is_scene_version_compatible(scene_data.metadata.format_version) {
             log!(
                 LogType::Game,
                 LogLevel::Warning,

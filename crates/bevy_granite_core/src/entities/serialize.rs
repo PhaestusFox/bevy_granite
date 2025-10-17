@@ -1,5 +1,5 @@
 use super::{IdentityData, TransformData, SaveSettings};
-use crate::{get_current_scene_version, world::WorldState};
+use crate::{ shared::version::Versions, world::WorldState};
 use bevy::prelude::{Quat, Vec3};
 use bevy_granite_logging::{
     config::{LogCategory, LogLevel, LogType},
@@ -16,9 +16,9 @@ use std::{
 };
 use uuid::Uuid;
 
-#[derive(Serialize, Deserialize, Debug)]
+#[derive(Serialize, Deserialize, Debug, Clone, Copy)]
 pub struct SceneMetadata {
-    pub format_version: String,
+    pub format_version: Versions,
     pub entity_count: usize,
 }
 
@@ -163,7 +163,7 @@ pub fn serialize_entities(world_state: WorldState, path: Option<String>) {
     if let Some(path) = path {
         // Create metadata with version from TOML file
         let metadata = SceneMetadata {
-            format_version: get_current_scene_version(),
+            format_version: Versions::CURRENT_VERSION,
             entity_count: entities_to_serialize.len(),
         };
 

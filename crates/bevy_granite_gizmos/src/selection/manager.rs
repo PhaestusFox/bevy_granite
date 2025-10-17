@@ -1,14 +1,13 @@
 use crate::selection::{events::EntityEvent, ActiveSelection, Selected};
 use bevy::{
     ecs::{observer::Trigger, world::OnAdd},
-    input::{keyboard::KeyCode, ButtonInput},
     prelude::{Component, Entity, Query, Res, With},
 };
 use bevy::{
     ecs::{query::QueryEntityError, system::Commands},
     picking::events::{Click, Pointer},
 };
-use bevy_granite_core::{shared::user_input, EditorIgnore, UserInput};
+use bevy_granite_core::{EditorIgnore, IconProxy, UserInput};
 use bevy_granite_logging::{
     config::{LogCategory, LogLevel, LogType},
     log,
@@ -90,16 +89,16 @@ pub fn deselect_entity(
 ) {
     match event.event() {
         EntityEvent::Deselect { target } => {
-            commands.entity(*target).remove::<Selected>();
+            commands.entity(*target).remove::<(ActiveSelection, Selected)>();
         }
         EntityEvent::DeselectRange { range } => {
             for entity in range {
-                commands.entity(*entity).remove::<Selected>();
+                commands.entity(*entity).remove::<(ActiveSelection, Selected)>();
             }
         }
         EntityEvent::DeselectAll => {
             for entity in selection.iter() {
-                commands.entity(entity).remove::<Selected>();
+                commands.entity(entity).remove::<(ActiveSelection, Selected)>();
             }
         }
         _ => {}
@@ -116,12 +115,6 @@ pub fn single_active(
     add_active.propagate(false);
     if active_selection.single().is_err() {
         for entity in &active_selection {
-            log(
-                LogType::Editor,
-                LogLevel::Info,
-                LogCategory::Input,
-                format!("Entity {} is no longer active", entity.index()),
-            );
             if entity != add_active.target() {
                 commands.entity(entity).remove::<ActiveSelection>();
             }
@@ -133,6 +126,7 @@ pub fn handle_picking_selection(
     mut on_click: Trigger<Pointer<Click>>,
     mut commands: Commands,
     ignored: Query<&EditorIgnore>,
+    icon_proxy_query: Query<&IconProxy>,
     user_input: Res<UserInput>,
 ) {
     if on_click.button != bevy::picking::pointer::PointerButton::Primary {
@@ -150,17 +144,36 @@ pub fn handle_picking_selection(
         }
         Err(_) => {}
     }
-    if on_click.target().index() == 0 || user_input.mouse_over_egui {
+    if user_input.mouse_over_egui {
+        return;
+    }
+    
+    if on_click.target().index() == 0 {
         log!(
             LogType::Editor,
             LogLevel::Info,
             LogCategory::Input,
-            "Clicked on window or egui, ignoring"
+            "Clicked on empty space, deselecting all entities"
         );
+        on_click.propagate(false);
+        commands.trigger(EntityEvent::DeselectAll);
         return;
     }
+    
     on_click.propagate(false);
-    let entity = on_click.target();
+    let mut entity = on_click.target();
+
+    // redirect to icon target
+    if let Ok(icon_proxy) = icon_proxy_query.get(entity) {
+        log!(
+            LogType::Editor,
+            LogLevel::Info,
+            LogCategory::Input,
+            "Icon proxy clicked, redirecting to target entity {}",
+            icon_proxy.target_entity.index()
+        );
+        entity = icon_proxy.target_entity;
+    }
 
     commands.trigger(EntityEvent::Select {
         target: entity,

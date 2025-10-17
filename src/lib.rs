@@ -51,7 +51,7 @@
 //!
 //! ```toml
 //! [dependencies]
-//! bevy_granite = { version = "0.1.0", default-features = false, features = ["core"] }
+//! bevy_granite = { version = "0.2.2", default-features = false, features = ["core"] }
 //! ```
 
 use bevy::app::{PluginGroup, PluginGroupBuilder};
@@ -139,13 +139,16 @@ pub mod prelude {
     pub use crate::{
         bevy_granite_core,
         bevy_granite_core::{
-            BridgeTag, MainCamera, RequestDespawnBySource, RequestDespawnSerializableEntities,
-            RequestLoadEvent, RequestReloadEvent, RequestSaveEvent, TreeHiddenEntity, UICamera,
+            absolute_asset_to_rel, rel_asset_to_absolute, BridgeTag, MainCamera,
+            RequestDespawnBySource, RequestDespawnSerializableEntities, RequestLoadEvent,
+            RequestReloadEvent, RequestSaveEvent, SaveSettings, SpawnSource, TreeHiddenEntity, UICamera,
             WorldLoadSuccessEvent, WorldSaveSuccessEvent,
         },
-        bevy_granite_logging::{LogCategory, LogLevel, LogType, log},
-        bevy_granite_macros::{granite_component, register_editor_components},
+        bevy_granite_logging::{log, LogCategory, LogLevel, LogType},
+        bevy_granite_macros::{granite_component, register_editor_components, ui_callable_events},
     };
+
+
 
     #[cfg(feature = "gizmos")]
     pub use crate::bevy_granite_gizmos::{
@@ -157,4 +160,7 @@ pub mod prelude {
         RequestCameraEntityFrame, RequestEditorToggle, RequestNewParent, RequestRemoveChildren,
         RequestRemoveParents, RequestToggleCameraSync,
     };
+
+    #[cfg(feature = "editor")]
+    pub use crate::bevy_granite_editor::interface::tabs::events::ui::register_ui_callable_events_with_senders;
 }

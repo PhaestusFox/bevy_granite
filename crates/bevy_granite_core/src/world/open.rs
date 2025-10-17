@@ -1,11 +1,12 @@
+use crate::absolute_asset_to_rel;
 use crate::assets::AvailableEditableMaterials;
 use crate::events::{RequestLoadEvent, WorldLoadSuccessEvent};
-use bevy::{asset::io::file::FileAssetReader, prelude::*};
+use crate::{assets::AvailableEditableMaterials, entities::deserialize_entities};
+use bevy::prelude::*;
 use bevy_granite_logging::{
     config::{LogCategory, LogLevel, LogType},
     log,
 };
-use std::path::Path;
 
 /// Watches for RequestLoadEvent and then deserializes the world from its path
 pub fn open_world_reader(
@@ -17,38 +18,29 @@ pub fn open_world_reader(
     mut world_open_reader: EventReader<RequestLoadEvent>,
     mut world_load_success_writer: EventWriter<WorldLoadSuccessEvent>,
 ) {
-    if let Some(RequestLoadEvent(path)) = world_open_reader.read().next() {
-        let abs_path: String;
-        if !Path::new(path).is_absolute() {
-            abs_path = FileAssetReader::get_base_path()
-                .join("assets/".to_string() + path)
-                .to_string_lossy()
-                .to_string();
-            log!(
-                LogType::Game,
-                LogLevel::Info,
-                LogCategory::System,
-                "Open world called: {:?}",
-                abs_path
-            );
-        } else {
-            abs_path = path.to_string();
-        }
+    if let Some(RequestLoadEvent(path, save_settings, translation)) =
+        world_open_reader.read().next()
+    {
+        let rel = absolute_asset_to_rel(path.to_string()).to_string();
+        deserialize_entities(
+            &asset_server,
+            &mut commands,
+            &mut materials,
+            &mut available_materials,
+            meshes,
+            rel.clone(),
+            save_settings.clone(),
+            *translation,
+        );
 
-        let Ok(version) =
-            crate::entities::serialize::SceneMetadata::extracted_version_from_file(&abs_path)
-        else {
-            log!(
-                LogType::Game,
-                LogLevel::Error,
-                LogCategory::System,
-                "Failed to extract version from scene file: {:?}",
-                path
-            );
-            return;
-        };
+        log!(
+            LogType::Game,
+            LogLevel::OK,
+            LogCategory::System,
+            "Loaded world: {:?}",
+            &rel
+        );
 
-        commands
-            .queue(move |world: &mut World| version.deserialize_entities(world, abs_path.into()));
+        world_load_success_writer.write(WorldLoadSuccessEvent(rel.clone()));
     }
 }

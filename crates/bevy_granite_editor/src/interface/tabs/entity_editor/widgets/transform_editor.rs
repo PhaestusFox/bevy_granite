@@ -3,10 +3,6 @@ use bevy::prelude::{EulerRot, Quat, Vec3};
 use bevy_egui::egui;
 use bevy_granite_core::TransformData;
 use bevy_granite_gizmos::GizmoAxis;
-use bevy_granite_logging::{
-    config::{LogCategory, LogLevel, LogType},
-    log,
-};
 use std::f32::consts::PI;
 
 // global_transform_data is serialized
@@ -24,12 +20,12 @@ pub struct EntityGlobalTransformData {
 
 impl EntityGlobalTransformData {
     pub fn clear(&mut self) {
-        log!(
-            LogType::Editor,
-            LogLevel::Info,
-            LogCategory::UI,
-            "EntityGlobalTransformData cleared"
-        );
+        //log!(
+        //    LogType::Editor,
+        //    LogLevel::Info,
+        //    LogCategory::UI,
+        //    "EntityGlobalTransformData cleared"
+        //);
         self.global_transform_data = TransformData::default();
         self.transform_data_changed = false;
         self.gizmo_axis = None;

@@ -3,14 +3,14 @@ use super::{
     events::{
         MaterialDeleteEvent, MaterialHandleUpdateEvent, PopupMenuRequestedEvent,
         RequestCameraEntityFrame, RequestEditorToggle, RequestNewParent, RequestRemoveChildren,
-        RequestRemoveParents, RequestToggleCameraSync, SetActiveWorld,
+        RequestRemoveParents, RequestToggleCameraSync, RequestViewportCameraOverride, SetActiveWorld,
         UserRequestGraniteTypeViaPopup, UserUpdatedComponentsEvent, UserUpdatedIdentityEvent,
         UserUpdatedTransformEvent,
     },
     layout::dock_ui_system,
     popups::{handle_popup_requests_system, show_active_popups_system},
     tabs::{
-        handle_material_deletion_system, update_debug_tab_ui_system,
+        handle_material_deletion_system, send_queued_events_system, update_debug_tab_ui_system,
         update_editor_settings_tab_system, update_entity_editor_tab_system,
         update_entity_with_new_components_system, update_entity_with_new_identity_system,
         update_entity_with_new_transform_system, update_log_tab_system,
@@ -43,6 +43,7 @@ impl Plugin for InterfacePlugin {
             .add_event::<RequestEditorToggle>()
             .add_event::<RequestCameraEntityFrame>()
             .add_event::<RequestToggleCameraSync>()
+            .add_event::<RequestViewportCameraOverride>()
             .add_event::<RequestNewParent>()
             .add_event::<RequestRemoveChildren>()
             .add_event::<RequestRemoveParents>()
@@ -101,6 +102,8 @@ impl Plugin for InterfacePlugin {
             .add_systems(
                 EguiPrimaryContextPass,
                 (show_active_popups_system, dock_ui_system).run_if(is_editor_active),
-            );
+            )
+            .add_systems(Update, send_queued_events_system.run_if(is_editor_active));
     }
 }
+

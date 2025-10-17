@@ -1,6 +1,5 @@
 use bevy::{
     ecs::hierarchy::{ChildOf, Children},
-    gizmos::config,
     pbr::{MeshMaterial3d, NotShadowCaster, NotShadowReceiver},
     prelude::{
         AlphaMode, Assets, Color, Commands, Component, Cone, Cylinder, Entity, GlobalTransform,
@@ -9,6 +8,7 @@ use bevy::{
     },
     render::mesh::Mesh3d,
 };
+use bevy_granite_core::TreeHiddenEntity;
 use bevy_granite_logging::{
     config::{LogCategory, LogLevel, LogType},
     log,
@@ -71,6 +71,7 @@ pub fn spawn_transform_gizmo(
             ))
             .insert(Name::new("TransformGizmo"))
             .insert(TransformGizmoParent)
+            .insert(TreeHiddenEntity)
             .id();
 
         build_gizmo_sphere(
@@ -255,7 +256,7 @@ pub fn despawn_transform_gizmo(
     query: &mut Query<(Entity, &TransformGizmo, &Children)>,
 ) {
     for (entity, _, _) in query.iter() {
-        commands.entity(entity).despawn();
+        commands.entity(entity).try_despawn();
         log!(
             LogType::Editor,
             LogLevel::Info,

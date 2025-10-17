@@ -30,11 +30,22 @@ pub use assets::{
     RequiredMaterialData, RequiredMaterialDataMut, StandardMaterialDef,
 };
 pub use bevy_granite_macros::register_editor_components;
+
+// Marker trait for UI callable events
+pub trait UICallableEventMarker {}
+
+// Trait for providing event information to UI
+pub trait UICallableEventProvider {
+    fn get_struct_name() -> &'static str;
+    fn get_event_names() -> &'static [&'static str];
+}
+
 pub use entities::{
     BridgeTag, Camera3D, ClassCategory, ComponentEditor, DirLight, EditorIgnore,
     GraniteEditorSerdeEntity, GraniteType, GraniteTypes, HasRuntimeData, IdentityData, MainCamera,
     MaterialNameSource, NeedsTangents, PointLightData, PromptData, PromptImportSettings, RectBrush,
-    ReflectedComponent, SpawnSource, TransformData, TreeHiddenEntity, UICamera, VolumetricFog, OBJ,
+    ReflectedComponent, SaveSettings, SpawnSource, TransformData, TreeHiddenEntity, UICamera,
+    VolumetricFog, OBJ,
 };
 pub use events::{
     CollectRuntimeDataEvent, RequestDespawnBySource, RequestDespawnSerializableEntities,
@@ -44,8 +55,8 @@ pub use events::{
 pub use setup::RegisteredTypeNames;
 pub use shared::{
     absolute_asset_to_rel, get_current_scene_version, get_minimum_scene_version,
-    is_scene_version_compatible, mouse_to_world_delta, version::get_beta_scene_version,
-    CursorWindowPos, IconEntity, IconProxy, IconType, InputTypes, UserInput,
+    is_scene_version_compatible, mouse_to_world_delta, rel_asset_to_absolute, CursorWindowPos,
+    IconEntity, IconProxy, IconType, InputTypes, UserInput,
 };
 
 // Bevy Granite Core plugin

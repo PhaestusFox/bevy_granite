@@ -27,18 +27,31 @@ pub use editable::*;
 #[reflect(Component, Serialize, Deserialize, Default, FromReflect)]
 pub struct MainCamera;
 
+#[derive(Reflect, Debug, Clone, Default, Serialize, Deserialize, PartialEq)]
+#[reflect(Serialize, Deserialize, FromReflect)]
+pub enum SaveSettings {
+    PreserveDiskFull,
+    PreserveDiskTransform,
+    #[default]
+    Runtime,
+}
+
 /// Tracks the source/origin of an entity
 /// String is relative path from /assets
 #[derive(Reflect, Serialize, Deserialize, Debug, Clone, Component, Default, PartialEq)]
 #[reflect(Component, Serialize, Deserialize, Default, FromReflect)]
-pub struct SpawnSource(Cow<'static, str>);
+pub struct SpawnSource(Cow<'static, str>, SaveSettings);
 impl SpawnSource {
-    pub fn new(path: impl Into<Cow<'static, str>>) -> Self {
-        Self(path.into())
+    pub fn new(path: impl Into<Cow<'static, str>>, spawn_as: SaveSettings) -> Self {
+        Self(path.into(), spawn_as)
     }
 
     pub fn str_ref(&self) -> &str {
         self.0.as_ref()
+    }
+
+    pub fn save_settings_ref(&self) -> &SaveSettings {
+        &self.1
     }
 }
 

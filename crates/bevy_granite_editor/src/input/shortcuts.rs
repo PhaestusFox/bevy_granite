@@ -2,7 +2,9 @@ use bevy::{
     math::Vec2,
     prelude::{Children, Commands, Entity, Query, Res},
 };
-use bevy_granite_core::{RequestLoadEvent, RequestReloadEvent, RequestSaveEvent, UserInput};
+use bevy_granite_core::{
+    entities::SaveSettings, RequestLoadEvent, RequestReloadEvent, RequestSaveEvent, UserInput,
+};
 use bevy_granite_gizmos::{selection::events::EntityEvent, Selected};
 use bevy_granite_logging::{log, LogCategory, LogLevel, LogType};
 use native_dialog::FileDialog;
@@ -36,9 +38,9 @@ fn handle_shortcuts(
     query: &Query<(Entity, &Selected, Option<&Children>)>,
     events: &mut EditorEvents,
 ) {
-    // F1
+    // F2
     // Toggle editor on/off
-    if input.key_f1.just_pressed {
+    if input.key_f2.just_pressed {
         log!(
             LogType::Editor,
             LogLevel::Info,
@@ -52,9 +54,9 @@ fn handle_shortcuts(
         return;
     }
 
-    // F2
+    // F3
     // sync cam
-    if input.key_f2.just_pressed {
+    if input.key_f3.just_pressed {
         log!(
             LogType::Editor,
             LogLevel::Info,
@@ -76,10 +78,10 @@ fn handle_shortcuts(
         for (entity, _, children) in query.iter() {
             if let Some(children) = children {
                 for &child in children.iter() {
-                    commands.entity(child).despawn();
+                    commands.entity(child).try_despawn();
                 }
             }
-            commands.entity(entity).despawn();
+            commands.entity(entity).try_despawn();
         }
     }
 
@@ -126,9 +128,9 @@ fn handle_shortcuts(
         });
     }
 
-    // H
+    // F1
     // Help
-    if input.key_h.just_pressed && !input.mouse_over_egui && !input.mouse_right.any {
+    if input.key_f1.just_pressed && !input.mouse_over_egui && !input.mouse_right.any {
         log!(
             LogType::Editor,
             LogLevel::Info,
@@ -155,9 +157,11 @@ fn handle_shortcuts(
             .show_open_single_file()
             .unwrap()
         {
-            events
-                .load
-                .write(RequestLoadEvent(path.display().to_string()));
+            events.load.write(RequestLoadEvent(
+                path.display().to_string(),
+                SaveSettings::Runtime,
+                None,
+            ));
         };
     }
 
@@ -198,10 +202,10 @@ fn handle_shortcuts(
         }
     }
 
-    // Fake undo for the time being
+    // Reload loaded worlds
     // Despawn entities and reload world
     if input.ctrl_left.pressed
-        && input.key_z.just_pressed
+        && input.key_r.just_pressed
         && !input.mouse_right.any
         && !input.mouse_left.any
     {

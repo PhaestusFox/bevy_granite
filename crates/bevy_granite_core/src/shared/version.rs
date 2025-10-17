@@ -115,13 +115,13 @@ impl Serialize for Version {
     }
 }
 
-impl PartialOrd for Version {
+impl PartialOrd for Versions {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for Version {
+impl Ord for Versions {
     fn cmp(&self, other: &Self) -> Ordering {
         // Compare major.minor.patch first
         match (

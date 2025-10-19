@@ -15,6 +15,7 @@ pub enum LogCategory {
     Other,
     Debug,
     Blank,
+    Serialization,
 }
 
 #[derive(Debug, PartialEq, Eq, Clone, Copy, Hash)]
@@ -79,6 +80,7 @@ impl LogCategory {
             LogCategory::Other => RgbaColor(255, 152, 0, 255),
             LogCategory::Blank => RgbaColor::WHITE,
             LogCategory::Debug => RgbaColor::GRAY,
+            LogCategory::Serialization => RgbaColor(255, 87, 34, 255), // IDK AI suggested this color
         }
     }
 }

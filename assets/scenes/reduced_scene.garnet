@@ -1,0 +1,642 @@
+GHSR
+[metadata]
+version: 0.1.5;
+entity_count: 12;
+format: HumanReduced;
+[entities]
+(
+	uuid: fc74ee15-902a-44db-813d-da3784207df1;
+	[components]
+	MapComponet: {
+		"Six": 24,
+		"Five": 29
+	};
+	ArrayComponet: [
+		28,
+		26,
+		26,
+		28,
+		22
+	];
+	SetComponet: {
+		"Six",
+		"Five"
+	};
+	ListComponet: [
+		"cloudberry",
+		"guava",
+		"elephantapple"
+	];
+	ChildOf: e2a20038-7ade-46ac-b030-368decb9b47d;
+)
+(
+	uuid: c4c1f9e9-9142-42f3-99a7-b7669e2fe290;
+	[components]
+	Name: "Entity: 169";
+	Transform: {
+		translation: {
+			x: 0.0,
+			y: 0.0,
+			z: 0.0,
+		},
+		rotation: {
+			x: 0.0,
+			y: 0.0,
+			z: 0.0,
+			w: 1.0,
+		},
+		scale: {
+			x: 1.0,
+			y: 1.0,
+			z: 1.0,
+		},
+	};
+	GlobalTransform: {
+		matrix3: {
+			x_axis: {
+				x: 1.0,
+				y: 0.0,
+				z: 0.0,
+			},
+			y_axis: {
+				x: 0.0,
+				y: 1.0,
+				z: 0.0,
+			},
+			z_axis: {
+				x: 0.0,
+				y: 0.0,
+				z: 1.0,
+			},
+		},
+		translation: {
+			x: 0.0,
+			y: 0.0,
+			z: 0.0,
+		},
+	};
+	TransformTreeChanged: ();
+	UnitStruct: ();
+	NewType: 423;
+	AnotherType: {
+		a: 0.19555938,
+		b: {
+			translation: {
+				x: 0.0,
+				y: 0.0,
+				z: 0.0,
+			},
+			rotation: {
+				x: 0.0,
+				y: 0.0,
+				z: 0.0,
+				w: 1.0,
+			},
+			scale: {
+				x: 0.8884848,
+				y: 0.8884848,
+				z: 0.8884848,
+			},
+		},
+	};
+	Camera3d: {
+		depth_load_op: Clear(0.0),
+		depth_texture_usages: 16,
+		screen_space_specular_transmission_steps: 1,
+		screen_space_specular_transmission_quality: Medium,
+	};
+	Camera: {
+		viewport: None,
+		order: 0,
+		is_active: true,
+		target: Window(Primary),
+		msaa_writeback: true,
+		clear_color: Default,
+		sub_camera_view: None,
+	};
+	Frustum: ();
+	CameraMainTextureUsages: Reflect(bevy_camera::camera::CameraMainTextureUsages);
+	VisibleEntities: ();
+	Visibility: Inherited;
+	InheritedVisibility: false;
+	ViewVisibility: false;
+	Projection: Perspective({
+		fov: 0.7853982,
+		aspect_ratio: 1.0,
+		near: 0.1,
+		far: 1000.0,
+	});
+	ChildOf: e2a20038-7ade-46ac-b030-368decb9b47d;
+)
+(
+	uuid: e2a20038-7ade-46ac-b030-368decb9b47d;
+	[components]
+	Name: "Entity: 225";
+	UnitEnum: C;
+	TupleEnum: F("plum", "orangelo", "uglifruit");
+	StructEnum: I {
+		x: "juneberry",
+		y: "guava",
+		z: "damson",
+	};
+	MixedEnum: Struct {
+		value: "yumberry",
+	};
+	Transform: {
+		translation: {
+			x: 0.4017133,
+			y: 0.1641795,
+			z: 0.65460056,
+		},
+		rotation: {
+			x: 0.0,
+			y: 0.0,
+			z: 0.0,
+			w: 1.0,
+		},
+		scale: {
+			x: 1.0,
+			y: 1.0,
+			z: 1.0,
+		},
+	};
+	GlobalTransform: {
+		matrix3: {
+			x_axis: {
+				x: 1.0,
+				y: 0.0,
+				z: 0.0,
+			},
+			y_axis: {
+				x: 0.0,
+				y: 1.0,
+				z: 0.0,
+			},
+			z_axis: {
+				x: 0.0,
+				y: 0.0,
+				z: 1.0,
+			},
+		},
+		translation: {
+			x: 0.0,
+			y: 0.0,
+			z: 0.0,
+		},
+	};
+	TransformTreeChanged: ();
+	NonTrivialEnum: Tonemapping {
+		value: TonyMcMapface,
+	};
+	Children: [
+		c4c1f9e9-9142-42f3-99a7-b7669e2fe290,
+		fc74ee15-902a-44db-813d-da3784207df1,
+		15998c1b-38c8-47fd-85e6-f751e4238555
+	];
+)
+(
+	uuid: 15998c1b-38c8-47fd-85e6-f751e4238555;
+	[components]
+	TupleComponent: (
+		"Tuple Three",
+		0.3510108
+	);
+	ChildOf: e2a20038-7ade-46ac-b030-368decb9b47d;
+)
+(
+	uuid: af10cc0a-09e1-43af-bf1c-bc4b563a371d;
+	[components]
+	MapComponet: {
+		"Three": 16,
+		"Four": 12
+	};
+	ArrayComponet: [
+		18,
+		14,
+		14,
+		19,
+		15
+	];
+	SetComponet: {
+		"Four",
+		"Three"
+	};
+	ListComponet: [
+		"jambolan",
+		"honeydew",
+		"orange"
+	];
+	ChildOf: b1d8d32e-843a-4732-b8d1-266013d9aae6;
+)
+(
+	uuid: a51539e3-05e9-49e0-86de-478b5c8979c1;
+	[components]
+	Name: "Entity: 31";
+	Transform: {
+		translation: {
+			x: 0.0,
+			y: 0.0,
+			z: 0.0,
+		},
+		rotation: {
+			x: 0.0,
+			y: 0.0,
+			z: 0.0,
+			w: 1.0,
+		},
+		scale: {
+			x: 1.0,
+			y: 1.0,
+			z: 1.0,
+		},
+	};
+	GlobalTransform: {
+		matrix3: {
+			x_axis: {
+				x: 1.0,
+				y: 0.0,
+				z: 0.0,
+			},
+			y_axis: {
+				x: 0.0,
+				y: 1.0,
+				z: 0.0,
+			},
+			z_axis: {
+				x: 0.0,
+				y: 0.0,
+				z: 1.0,
+			},
+		},
+		translation: {
+			x: 0.0,
+			y: 0.0,
+			z: 0.0,
+		},
+	};
+	TransformTreeChanged: ();
+	UnitStruct: ();
+	NewType: 519;
+	AnotherType: {
+		a: 0.46231592,
+		b: {
+			translation: {
+				x: 0.0,
+				y: 0.0,
+				z: 0.0,
+			},
+			rotation: {
+				x: 0.0,
+				y: 0.025134182,
+				z: 0.0,
+				w: 0.9996841,
+			},
+			scale: {
+				x: 1.0,
+				y: 1.0,
+				z: 1.0,
+			},
+		},
+	};
+	Camera3d: {
+		depth_load_op: Clear(0.0),
+		depth_texture_usages: 16,
+		screen_space_specular_transmission_steps: 1,
+		screen_space_specular_transmission_quality: Medium,
+	};
+	Camera: {
+		viewport: None,
+		order: 0,
+		is_active: true,
+		target: Window(Primary),
+		msaa_writeback: true,
+		clear_color: Default,
+		sub_camera_view: None,
+	};
+	Frustum: ();
+	CameraMainTextureUsages: Reflect(bevy_camera::camera::CameraMainTextureUsages);
+	VisibleEntities: ();
+	Visibility: Inherited;
+	InheritedVisibility: false;
+	ViewVisibility: false;
+	Projection: Perspective({
+		fov: 0.7853982,
+		aspect_ratio: 1.0,
+		near: 0.1,
+		far: 1000.0,
+	});
+	ChildOf: b1d8d32e-843a-4732-b8d1-266013d9aae6;
+)
+(
+	uuid: b1d8d32e-843a-4732-b8d1-266013d9aae6;
+	[components]
+	Name: "Entity: 243";
+	UnitEnum: B;
+	TupleEnum: E(0.39064926, 0.7100715);
+	StructEnum: H {
+		a: 0.14087999,
+		b: 0.80216485,
+	};
+	MixedEnum: Tuple(2246435968);
+	Transform: {
+		translation: {
+			x: 0.21870553,
+			y: 0.63682836,
+			z: 0.012592971,
+		},
+		rotation: {
+			x: 0.0,
+			y: 0.0,
+			z: 0.0,
+			w: 1.0,
+		},
+		scale: {
+			x: 1.0,
+			y: 1.0,
+			z: 1.0,
+		},
+	};
+	GlobalTransform: {
+		matrix3: {
+			x_axis: {
+				x: 1.0,
+				y: 0.0,
+				z: 0.0,
+			},
+			y_axis: {
+				x: 0.0,
+				y: 1.0,
+				z: 0.0,
+			},
+			z_axis: {
+				x: 0.0,
+				y: 0.0,
+				z: 1.0,
+			},
+		},
+		translation: {
+			x: 0.0,
+			y: 0.0,
+			z: 0.0,
+		},
+	};
+	TransformTreeChanged: ();
+	NonTrivialEnum: Name {
+		value: "Entity: 144",
+	};
+	Children: [
+		a51539e3-05e9-49e0-86de-478b5c8979c1,
+		af10cc0a-09e1-43af-bf1c-bc4b563a371d,
+		ebb953cb-e112-4a9a-97cc-055c9560fa1b
+	];
+)
+(
+	uuid: ebb953cb-e112-4a9a-97cc-055c9560fa1b;
+	[components]
+	TupleComponent: (
+		"Tuple Two",
+		0.86650026
+	);
+	ChildOf: b1d8d32e-843a-4732-b8d1-266013d9aae6;
+)
+(
+	uuid: e39eb631-f79d-454d-a6cf-3156e50354c5;
+	[components]
+	MapComponet: {
+		"One": 1,
+		"Two": 8
+	};
+	ArrayComponet: [
+		6,
+		1,
+		4,
+		0,
+		8
+	];
+	SetComponet: {
+		"One",
+		"Two"
+	};
+	ListComponet: [
+		"currant",
+		"icaco",
+		"wolfberry"
+	];
+	ChildOf: aa50e791-80f7-4e16-af29-8c5fdcf4b2a7;
+)
+(
+	uuid: 8ebb56ed-3d83-4b0b-b899-06f27b1d42f8;
+	[components]
+	Name: "Entity: 232";
+	Transform: {
+		translation: {
+			x: 0.0,
+			y: 0.0,
+			z: 0.0,
+		},
+		rotation: {
+			x: 0.0,
+			y: 0.0,
+			z: 0.0,
+			w: 1.0,
+		},
+		scale: {
+			x: 1.0,
+			y: 1.0,
+			z: 1.0,
+		},
+	};
+	GlobalTransform: {
+		matrix3: {
+			x_axis: {
+				x: 1.0,
+				y: 0.0,
+				z: 0.0,
+			},
+			y_axis: {
+				x: 0.0,
+				y: 1.0,
+				z: 0.0,
+			},
+			z_axis: {
+				x: 0.0,
+				y: 0.0,
+				z: 1.0,
+			},
+		},
+		translation: {
+			x: 0.0,
+			y: 0.0,
+			z: 0.0,
+		},
+	};
+	TransformTreeChanged: ();
+	UnitStruct: ();
+	NewType: 617;
+	AnotherType: {
+		a: 0.4149568,
+		b: {
+			translation: {
+				x: 0.34778547,
+				y: 0.34778547,
+				z: 0.34778547,
+			},
+			rotation: {
+				x: 0.0,
+				y: 0.0,
+				z: 0.0,
+				w: 1.0,
+			},
+			scale: {
+				x: 1.0,
+				y: 1.0,
+				z: 1.0,
+			},
+		},
+	};
+	Camera3d: {
+		depth_load_op: Clear(0.0),
+		depth_texture_usages: 16,
+		screen_space_specular_transmission_steps: 1,
+		screen_space_specular_transmission_quality: Medium,
+	};
+	Camera: {
+		viewport: None,
+		order: 0,
+		is_active: true,
+		target: Window(Primary),
+		msaa_writeback: true,
+		clear_color: Default,
+		sub_camera_view: None,
+	};
+	Frustum: ();
+	CameraMainTextureUsages: Reflect(bevy_camera::camera::CameraMainTextureUsages);
+	VisibleEntities: ();
+	Visibility: Inherited;
+	InheritedVisibility: false;
+	ViewVisibility: false;
+	Projection: Perspective({
+		fov: 0.7853982,
+		aspect_ratio: 1.0,
+		near: 0.1,
+		far: 1000.0,
+	});
+	ChildOf: aa50e791-80f7-4e16-af29-8c5fdcf4b2a7;
+)
+(
+	uuid: aa50e791-80f7-4e16-af29-8c5fdcf4b2a7;
+	[components]
+	Name: "Entity: 223";
+	UnitEnum: A;
+	TupleEnum: D(2261546851);
+	StructEnum: G {
+		q: 1068323197,
+	};
+	MixedEnum: Unit;
+	Transform: {
+		translation: {
+			x: 0.99008465,
+			y: 0.40590173,
+			z: 0.9690189,
+		},
+		rotation: {
+			x: 0.0,
+			y: 0.0,
+			z: 0.0,
+			w: 1.0,
+		},
+		scale: {
+			x: 1.0,
+			y: 1.0,
+			z: 1.0,
+		},
+	};
+	GlobalTransform: {
+		matrix3: {
+			x_axis: {
+				x: 1.0,
+				y: 0.0,
+				z: 0.0,
+			},
+			y_axis: {
+				x: 0.0,
+				y: 1.0,
+				z: 0.0,
+			},
+			z_axis: {
+				x: 0.0,
+				y: 0.0,
+				z: 1.0,
+			},
+		},
+		translation: {
+			x: 0.0,
+			y: 0.0,
+			z: 0.0,
+		},
+	};
+	TransformTreeChanged: ();
+	NonTrivialEnum: Transform {
+		value: {
+		translation: {
+			x: 0.5427252,
+			y: 0.86842656,
+			z: 0.6364651,
+		},
+		rotation: {
+			x: 0.0,
+			y: 0.0,
+			z: 0.0,
+			w: 1.0,
+		},
+		scale: {
+			x: 1.0,
+			y: 1.0,
+			z: 1.0,
+		},
+	},
+	};
+	Children: [
+		8ebb56ed-3d83-4b0b-b899-06f27b1d42f8,
+		e39eb631-f79d-454d-a6cf-3156e50354c5,
+		a4668c40-6160-473a-9380-710f45fe74ab
+	];
+)
+(
+	uuid: a4668c40-6160-473a-9380-710f45fe74ab;
+	[components]
+	TupleComponent: (
+		"Tuple One",
+		0.13340974
+	);
+	ChildOf: aa50e791-80f7-4e16-af29-8c5fdcf4b2a7;
+)
+[name map]
+UnitEnum -> bevy_granite_scene::reflect_serde::test::data_generation::enums::UnitEnum;
+UnitStruct -> bevy_granite_scene::reflect_serde::test::data_generation::structs::UnitStruct;
+Camera -> bevy_camera::camera::Camera;
+VisibleEntities -> bevy_camera::visibility::VisibleEntities;
+SetComponet -> bevy_granite_scene::reflect_serde::test::data_generation::collections::SetComponet;
+ArrayComponet -> bevy_granite_scene::reflect_serde::test::data_generation::collections::ArrayComponet;
+TransformTreeChanged -> bevy_transform::components::transform::TransformTreeChanged;
+CameraMainTextureUsages -> bevy_camera::camera::CameraMainTextureUsages;
+ChildOf -> bevy_ecs::hierarchy::ChildOf;
+Camera3d -> bevy_camera::components::Camera3d;
+ListComponet -> bevy_granite_scene::reflect_serde::test::data_generation::collections::ListComponet;
+MapComponet -> bevy_granite_scene::reflect_serde::test::data_generation::collections::MapComponet;
+GlobalTransform -> bevy_transform::components::global_transform::GlobalTransform;
+InheritedVisibility -> bevy_camera::visibility::InheritedVisibility;
+NewType -> bevy_granite_scene::reflect_serde::test::data_generation::structs::NewType;
+Name -> bevy_ecs::name::Name;
+AnotherType -> bevy_granite_scene::reflect_serde::test::data_generation::structs::AnotherType;
+Transform -> bevy_transform::components::transform::Transform;
+ViewVisibility -> bevy_camera::visibility::ViewVisibility;
+Projection -> bevy_camera::projection::Projection;
+TupleEnum -> bevy_granite_scene::reflect_serde::test::data_generation::enums::TupleEnum;
+StructEnum -> bevy_granite_scene::reflect_serde::test::data_generation::enums::StructEnum;
+MixedEnum -> bevy_granite_scene::reflect_serde::test::data_generation::enums::MixedEnum;
+TupleComponent -> bevy_granite_scene::reflect_serde::test::data_generation::tuples::TupleComponent;
+NonTrivialEnum -> bevy_granite_scene::reflect_serde::test::data_generation::enums::NonTrivialEnum;
+Frustum -> bevy_camera::primitives::Frustum;
+Visibility -> bevy_camera::visibility::Visibility;
+Children -> bevy_ecs::hierarchy::Children;

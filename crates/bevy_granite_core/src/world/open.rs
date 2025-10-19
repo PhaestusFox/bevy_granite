@@ -2,7 +2,7 @@ use std::io::BufRead;
 
 use crate::absolute_asset_to_rel;
 use crate::events::{RequestLoadEvent, WorldLoadSuccessEvent};
-use crate::shared::version::{self, Versions};
+use crate::shared::version::{self, Version};
 use crate::{assets::AvailableEditableMaterials, entities::deserialize_scene_v0_1_4};
 use bevy::prelude::*;
 use bevy_granite_logging::{
@@ -67,9 +67,9 @@ pub fn open_world_reader(
                 .trim_end_matches(',')
                 .trim_end_matches('"');
 
-            match version.parse::<Versions>() {
+            match version.parse::<Version>() {
                 // if version is 0.1.4 call old code
-                Ok(Versions::V0_1_4) => {
+                Ok(Version::V0_1_4) => {
                     deserialize_scene_v0_1_4(
                         &asset_server,
                         &mut commands,

@@ -9,8 +9,6 @@ mod scene;
 type Result<T> = std::result::Result<T, scene::SceneFormatError>;
 type MetaData = scene::SceneMetadata;
 
-type Version = bevy_granite_core::shared::version::Versions;
-
 pub struct StrPointer<T> {
     current: usize,
     buffer: T,

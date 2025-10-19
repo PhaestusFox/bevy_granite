@@ -5,7 +5,7 @@ use std::{
 };
 
 use super::*;
-use crate::{StrPointer, Version, scene::SceneFormatError};
+use crate::{StrPointer, scene::SceneFormatError};
 
 pub struct SceneLoader<'a, W> {
     metadata: MetaData,

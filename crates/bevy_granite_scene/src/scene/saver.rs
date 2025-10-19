@@ -1,3 +1,5 @@
+use bevy_granite_core::shared::version::Version;
+
 use super::*;
 
 pub struct SceneSaver<'a, W> {
@@ -138,7 +140,7 @@ impl<'a, W: std::fmt::Write> SceneSaver<'a, W> {
             &mut self.file,
             "{}\nversion: {};",
             Chapters::Metadata,
-            crate::Version::PRE_RELEASE_VERSION
+            Version::PRE_RELEASE_VERSION
         )?;
 
         let count = self.entity_count();

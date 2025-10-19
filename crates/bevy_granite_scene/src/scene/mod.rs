@@ -10,7 +10,7 @@ use bevy::{
     prelude::{Deref, DerefMut},
     reflect::TypeRegistry,
 };
-use bevy_granite_core::{EditorIgnore, shared::version::Versions};
+use bevy_granite_core::{EditorIgnore, shared::version::Version};
 use strum::IntoEnumIterator;
 
 use crate::{MetaData, Result};
@@ -66,7 +66,7 @@ pub use loader::SceneLoader;
 pub struct SceneMetadata {
     pub entity_map: EntityHashMap<EntityMetaData>,
     pub uuid_map: Option<HashMap<uuid::Uuid, Entity>>,
-    pub version: Versions,
+    pub version: Version,
 }
 
 impl SceneMetadata {
@@ -74,7 +74,7 @@ impl SceneMetadata {
         Self {
             entity_map: EntityHashMap::default(),
             uuid_map: None,
-            version: Versions::PRE_RELEASE_VERSION,
+            version: Version::PRE_RELEASE_VERSION,
         }
     }
 
@@ -105,12 +105,12 @@ impl SceneMetadata {
                 "version",
             ))?
             .trim()
-            .parse::<Versions>()?;
+            .parse::<Version>()?;
 
         let entity_count = section
             .get("entity_count")
             .and_then(|s| s.trim().parse().ok())
-            .map(|c| HashMap::with_capacity(c));
+            .map(HashMap::with_capacity);
         Ok(Self {
             entity_map: EntityHashMap::new(),
             uuid_map: entity_count,

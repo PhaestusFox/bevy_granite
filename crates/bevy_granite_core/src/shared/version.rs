@@ -1,9 +1,6 @@
 use bevy_granite_logging::{log, LogCategory, LogLevel, LogType};
 use serde::{Deserialize, Serialize};
 use std::{cmp::Ordering, ops::Deref, str::FromStr};
-use bevy_granite_logging::{log, LogCategory, LogLevel, LogType};
-use serde::{Deserialize, Serialize};
-use std::{cmp::Ordering, ops::Deref, str::FromStr};
 
 #[derive(Deserialize, Debug)]
 struct FileVersionConfig {
@@ -118,15 +115,13 @@ impl Serialize for Version {
     }
 }
 
-impl PartialOrd for Versions {
-impl PartialOrd for Versions {
+impl PartialOrd for Version {
     fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
         Some(self.cmp(other))
     }
 }
 
-impl Ord for Versions {
-impl Ord for Versions {
+impl Ord for Version {
     fn cmp(&self, other: &Self) -> Ordering {
         // Compare major.minor.patch first
         match (
@@ -134,14 +129,8 @@ impl Ord for Versions {
             self.minor().cmp(&other.minor()),
             self.patch().cmp(&other.patch()),
         ) {
-        match (
-            self.major().cmp(&other.major()),
-            self.minor().cmp(&other.minor()),
-            self.patch().cmp(&other.patch()),
-        ) {
             (Ordering::Equal, Ordering::Equal, Ordering::Equal) => {
                 // Core versions are equal, now compare pre-release
-                match (&self.suffix(), &other.suffix()) {
                 match (&self.suffix(), &other.suffix()) {
                     (None, None) => Ordering::Equal,
                     (None, Some(_)) => Ordering::Greater, // Stable > pre-release
@@ -173,7 +162,6 @@ pub fn is_scene_version_compatible(version: Version) -> bool {
             LogCategory::System,
             "Version '{}' matches current version exactly",
             version
-            version
         );
         return true;
     }
@@ -181,11 +169,6 @@ pub fn is_scene_version_compatible(version: Version) -> bool {
     // Check if version is at least the minimum supported
     if version >= min_version {
         if version < current_version {
-            let version_type = if version.is_pre_release() {
-                "pre-release"
-            } else {
-                "stable"
-            };
             let version_type = if version.is_pre_release() {
                 "pre-release"
             } else {
@@ -200,17 +183,9 @@ pub fn is_scene_version_compatible(version: Version) -> bool {
                 version,
                 current_version,
                 min_version
-                version,
-                current_version,
-                min_version
             );
         } else {
             // version > current_version
-            let version_type = if version.is_pre_release() {
-                "pre-release"
-            } else {
-                "stable"
-            };
             let version_type = if version.is_pre_release() {
                 "pre-release"
             } else {
@@ -235,23 +210,15 @@ pub fn is_scene_version_compatible(version: Version) -> bool {
     } else {
         "stable"
     };
-    let version_type = if version.is_pre_release() {
-        "pre-release"
-    } else {
-        "stable"
-    };
     log!(
         LogType::Game,
         LogLevel::Error,
         LogCategory::System,
         "Version '{}' ({}) is below minimum supported version '{}'. Current version is '{}'.",
         version,
-        version,
         version_type,
         min_version,
-        current_version
-        min_version,
-        current_version
+        current_version,
     );
     false
 }
